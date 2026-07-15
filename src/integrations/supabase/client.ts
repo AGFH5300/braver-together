@@ -15,8 +15,10 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
       new Headers(init.headers).forEach((value, key) => headers.set(key, value));
     }
 
-    // New Supabase API keys are opaque strings, not bearer JWTs.
-    if (isNewSupabaseApiKey(supabaseKey) && headers.get("Authorization") === `Bearer ${supabaseKey}`) {
+    if (
+      isNewSupabaseApiKey(supabaseKey) &&
+      headers.get("Authorization") === `Bearer ${supabaseKey}`
+    ) {
       headers.delete("Authorization");
     }
 
@@ -26,7 +28,8 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  const serverEnvironment = typeof process !== "undefined" ? process.env : {};
+  const serverEnvironment: Record<string, string | undefined> =
+    typeof process !== "undefined" ? process.env : {};
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || serverEnvironment.SUPABASE_URL;
   const supabasePublishableKey =
     import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
