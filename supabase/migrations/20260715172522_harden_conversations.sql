@@ -1,4 +1,3 @@
--- Prevent clients from changing conversation ownership or system-managed timestamps.
 CREATE OR REPLACE FUNCTION public.guard_conversation_update()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -28,7 +27,6 @@ CREATE TRIGGER conversations_guard_update
 
 REVOKE EXECUTE ON FUNCTION public.guard_conversation_update() FROM PUBLIC, anon, authenticated;
 
--- A teen may only start a conversation with a published advisor who is accepting messages.
 DROP POLICY IF EXISTS "teen starts conversation" ON public.conversations;
 CREATE POLICY "teen starts conversation"
   ON public.conversations
@@ -47,7 +45,6 @@ CREATE POLICY "teen starts conversation"
     )
   );
 
--- Participants may change status, but ownership remains immutable through the trigger above.
 DROP POLICY IF EXISTS "participants update conversation" ON public.conversations;
 CREATE POLICY "participants update conversation"
   ON public.conversations

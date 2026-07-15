@@ -1,4 +1,3 @@
-
 -- Roles
 CREATE TYPE public.app_role AS ENUM ('admin', 'advisor', 'teen');
 
@@ -39,7 +38,6 @@ GRANT SELECT ON public.profiles TO anon;
 GRANT ALL ON public.profiles TO service_role;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Public advisor profiles are visible to anyone (anon + authenticated)
 CREATE POLICY "public advisor profiles" ON public.profiles FOR SELECT
   USING (is_advisor = true AND is_public = true);
 CREATE POLICY "users read own profile" ON public.profiles FOR SELECT TO authenticated
@@ -49,7 +47,6 @@ CREATE POLICY "users update own profile" ON public.profiles FOR UPDATE TO authen
 CREATE POLICY "users insert own profile" ON public.profiles FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = id);
 
--- Trigger: auto-create profile + default 'teen' role on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -112,7 +109,6 @@ CREATE POLICY "participants send messages" ON public.messages FOR INSERT TO auth
     WHERE c.id = conversation_id AND (c.teen_id = auth.uid() OR c.advisor_id = auth.uid())
   ));
 
--- Bump conversation.last_message_at on insert
 CREATE OR REPLACE FUNCTION public.bump_conversation()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -142,6 +138,5 @@ CREATE POLICY "participants file report" ON public.reports FOR INSERT TO authent
 CREATE POLICY "admins read reports" ON public.reports FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
 
--- Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
