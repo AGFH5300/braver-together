@@ -2,9 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
+import { MAX_CONTRACT_CHARACTERS } from "./decoder.constants";
 import { createAiProvider } from "./ai-provider.server";
-
-export const MAX_CONTRACT_CHARACTERS = 120_000;
 
 const ClauseSchema = z.object({
   risk: z.enum(["high", "medium", "low", "standard"]),
