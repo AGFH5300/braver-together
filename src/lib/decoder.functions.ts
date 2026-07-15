@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { createAiProvider } from "./ai-provider.server";
 
 const ClauseSchema = z.object({
   risk: z.enum(["high", "medium", "low", "standard"]),
@@ -18,18 +18,28 @@ const AnalysisSchema = z.object({
 
 export type ContractAnalysis = z.infer<typeof AnalysisSchema>;
 
-// Generous cap — Gemini 3 Flash has a huge context window, easily handles Instagram/TikTok TOS.
 const Input = z.object({ text: z.string().min(20).max(500000) });
 
 export const analyzeContract = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }): Promise<ContractAnalysis> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const gateway = createLovableAiGatewayProvider(key);
+    const apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
+    const modelName = process.env.AI_MODEL;
 
-    const { experimental_output } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
+    if (!apiKey) {
+      throw new Error("Missing AI_API_KEY or OPENAI_API_KEY");
+    }
+    if (!modelName) {
+      throw new Error("Missing AI_MODEL");
+    }
+
+    const provider = createAiProvider({
+      apiKey,
+      baseUrl: process.env.AI_BASE_URL,
+    });
+
+    const { experimental_output: output } = await generateText({
+      model: provider(modelName),
       experimental_output: Output.object({ schema: AnalysisSchema }),
       system: `You are a legal-literacy assistant for teens (ages 12-18). Analyze the provided Terms of Service, Privacy Policy, or digital contract — even if it is very long (tens of thousands of words).
 
@@ -47,5 +57,5 @@ For long documents, scan the entire text and surface the 5-12 most important cla
       prompt: `Contract text:\n\n${data.text}`,
     });
 
-    return experimental_output;
+    return output;
   });
