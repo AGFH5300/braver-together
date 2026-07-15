@@ -1,0 +1,1 @@
+export const MAX_CONTRACT_CHARACTERS = 120_000;

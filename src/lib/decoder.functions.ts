@@ -1,51 +1,65 @@
 import { createServerFn } from "@tanstack/react-start";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+
+import { MAX_CONTRACT_CHARACTERS } from "./decoder.constants";
+import { createAiProvider } from "./ai-provider.server";
 
 const ClauseSchema = z.object({
   risk: z.enum(["high", "medium", "low", "standard"]),
-  title: z.string(),
-  quote: z.string(),
-  plainEnglish: z.string(),
+  title: z.string().min(1).max(120),
+  quote: z.string().min(1).max(500),
+  plainEnglish: z.string().min(1).max(1_200),
 });
 
-const AnalysisSchema = z.object({
-  summary: z.string(),
-  highRiskCount: z.number(),
-  clauses: z.array(ClauseSchema),
+const GeneratedAnalysisSchema = z.object({
+  summary: z.string().min(1).max(2_000),
+  clauses: z.array(ClauseSchema).min(1).max(12),
 });
 
-export type ContractAnalysis = z.infer<typeof AnalysisSchema>;
+export type ContractAnalysis = z.infer<typeof GeneratedAnalysisSchema> & {
+  highRiskCount: number;
+};
 
-// Generous cap — Gemini 3 Flash has a huge context window, easily handles Instagram/TikTok TOS.
-const Input = z.object({ text: z.string().min(20).max(500000) });
+const Input = z.object({
+  text: z.string().trim().min(20).max(MAX_CONTRACT_CHARACTERS),
+});
 
 export const analyzeContract = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }): Promise<ContractAnalysis> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
-    const gateway = createLovableAiGatewayProvider(key);
+    const apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
+    const modelName = process.env.AI_MODEL;
 
-    const { experimental_output } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
-      experimental_output: Output.object({ schema: AnalysisSchema }),
-      system: `You are a legal-literacy assistant for teens (ages 12-18). Analyze the provided Terms of Service, Privacy Policy, or digital contract — even if it is very long (tens of thousands of words).
+    if (!apiKey) throw new Error("Missing AI_API_KEY or OPENAI_API_KEY");
+    if (!modelName) throw new Error("Missing AI_MODEL");
+
+    const provider = createAiProvider({
+      apiKey,
+      baseUrl: process.env.AI_BASE_URL,
+      supportsStructuredOutputs: process.env.AI_STRUCTURED_OUTPUTS !== "false",
+    });
+
+    const { output } = await generateText({
+      model: provider(modelName),
+      output: Output.object({ schema: GeneratedAnalysisSchema }),
+      maxOutputTokens: 2_500,
+      system: `You are a legal-literacy assistant for teens ages 12–18. Analyze the provided Terms of Service, Privacy Policy, or digital contract across the entire supplied text.
 
 Return:
-- "summary": one short paragraph (2-3 sentences) summarizing what the user is actually agreeing to. Mention how many high-risk clauses were flagged.
-- "highRiskCount": integer count of clauses with risk="high".
-- "clauses": list of the most notable clauses across the WHOLE document. For each:
-  - "risk": "high" (gives up significant rights / data sold / broad licenses / waives legal rights / arbitrary termination),
-            "medium" (notable rights/content concerns), "low" (minor concerns), or "standard" (normal/expected).
-  - "title": short label like "Data Sharing" or "Content License".
-  - "quote": a short verbatim snippet (under 200 chars) from the contract, with "..." if trimmed.
-  - "plainEnglish": 1-2 sentences explaining what it really means, in language a 14-year-old understands.
+- "summary": one short paragraph of 2–3 sentences explaining what the user is agreeing to.
+- "clauses": 5–12 of the most notable clauses across the whole document. For each clause return:
+  - "risk": "high" for significant rights loss, data selling, broad content licences, legal-right waivers, or arbitrary termination; "medium" for notable concerns; "low" for minor concerns; or "standard" for normal terms.
+  - "title": a short descriptive label.
+  - "quote": a verbatim excerpt under 200 characters, using ellipses if trimmed.
+  - "plainEnglish": 1–2 sentences understandable to a 14-year-old.
 
-For long documents, scan the entire text and surface the 5-12 most important clauses (don't just summarize section 1). Include 2-3 standard clauses for context. Be honest about risks but not alarmist.`,
+Include 2–3 standard or low-risk clauses for context when the document contains them. Be accurate and calm rather than alarmist. Do not invent language that is not present in the supplied text.`,
       prompt: `Contract text:\n\n${data.text}`,
     });
 
-    return experimental_output;
+    return {
+      ...output,
+      highRiskCount: output.clauses.filter((clause) => clause.risk === "high").length,
+    };
   });
