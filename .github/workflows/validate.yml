@@ -1,6 +1,7 @@
 name: Validate npm build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - fix/npm-and-lovable-cleanup
