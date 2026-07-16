@@ -1,9 +1,11 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Loader2, Mail, Lock, User as UserIcon, ShieldCheck } from "lucide-react";
+
+import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -11,7 +13,7 @@ export const Route = createFileRoute("/auth")({
       { title: "Sign in — BraverTogether" },
       {
         name: "description",
-        content: "Sign in or create an account to message advisors and book calls.",
+        content: "Sign in or create an account to message advisors and manage meetings.",
       },
     ],
   }),
@@ -25,38 +27,69 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [inlineMessage, setInlineMessage] = useState<string | null>(null);
+  const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/messages" });
+    let cancelled = false;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user) void navigate({ to: "/messages" });
     });
+
+    const resetTransientState = () => setGoogleLoading(false);
+    window.addEventListener("pageshow", resetTransientState);
+    document.addEventListener("visibilitychange", resetTransientState);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pageshow", resetTransientState);
+      document.removeEventListener("visibilitychange", resetTransientState);
+    };
   }, [navigate]);
 
-  async function handleGoogle() {
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth`,
-      },
-    });
-
-    if (error) {
-      toast.error(error.message || "Google sign-in failed");
-      setLoading(false);
-    }
+  function changeMode(nextMode: "signin" | "signup") {
+    setMode(nextMode);
+    setInlineMessage(null);
+    setPassword("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (mode === "signup" && !agreed) {
-      toast.error("Please agree to the community rules");
+  async function handleGoogle() {
+    if (!googleEnabled) {
+      setInlineMessage("Google sign-in is not available yet. Please use email and password.");
       return;
     }
 
-    setLoading(true);
+    setGoogleLoading(true);
+    setInlineMessage(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth`,
+          skipBrowserRedirect: true,
+        },
+      });
+      if (error) throw error;
+      if (!data.url) throw new Error("Google sign-in could not be started.");
+      window.location.assign(data.url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Google sign-in failed.";
+      setInlineMessage(message);
+      toast.error(message);
+      setGoogleLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setInlineMessage(null);
+    if (mode === "signup" && !agreed) {
+      setInlineMessage("Please agree to the community rules before creating an account.");
+      return;
+    }
+
+    setFormLoading(true);
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -64,78 +97,112 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth`,
-            data: { display_name: displayName || email.split("@")[0] },
+            data: { display_name: displayName.trim() || email.split("@")[0] },
           },
         });
         if (error) throw error;
 
         if (!data.session) {
-          toast.success("Account created. Check your email to confirm your address.");
+          setInlineMessage("Account created. Check your email to confirm your address, then sign in.");
           setMode("signin");
+          setPassword("");
           return;
         }
-
-        toast.success("Account created!");
+        toast.success("Account created");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success("Signed in");
       }
 
-      navigate({ to: "/messages" });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
+      await navigate({ to: "/messages" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Something went wrong.";
+      setInlineMessage(message);
       toast.error(message);
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   }
 
+  const busy = formLoading || googleLoading;
+
   return (
     <SiteLayout>
-      <div className="bg-hero relative overflow-hidden">
+      <div className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 dot-pattern opacity-50" />
-        <Section className="py-20 relative">
-          <div className="max-w-md mx-auto">
+        <Section className="relative py-20">
+          <div className="mx-auto max-w-md">
             <Eyebrow>{mode === "signup" ? "Create your account" : "Welcome back"}</Eyebrow>
             <h1 className="mt-4 text-4xl font-bold text-navy-deep">
-              {mode === "signup" ? "Join BraverTogether." : "Sign in."}
+              {mode === "signup" ? "Join BraverTogether." : "Sign in to continue."}
             </h1>
             <p className="mt-3 text-navy-deep/70">
               {mode === "signup"
-                ? "Message verified advisors, book calls, and keep your conversations in one place."
-                : "Pick up where you left off."}
+                ? "Ask advisors, follow conversations and manage meeting proposals in one account."
+                : "Access your messages, profile and meetings."}
             </p>
 
-            <div className="mt-8 rounded-2xl border border-border bg-card/95 backdrop-blur p-6 shadow-card">
+            <div className="mt-8 rounded-2xl border border-border bg-card/95 p-6 shadow-card backdrop-blur">
+              <div className="grid grid-cols-2 rounded-xl bg-secondary p-1" aria-label="Account action">
+                <button
+                  type="button"
+                  onClick={() => changeMode("signup")}
+                  className={cn(
+                    "rounded-lg px-4 py-2.5 text-sm font-semibold transition",
+                    mode === "signup" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Create account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeMode("signin")}
+                  className={cn(
+                    "rounded-lg px-4 py-2.5 text-sm font-semibold transition",
+                    mode === "signin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Sign in
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={handleGoogle}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 rounded-full border border-border bg-white px-4 py-2.5 text-sm font-semibold hover:bg-secondary transition disabled:opacity-50"
+                disabled={busy || !googleEnabled}
+                className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-navy/15 bg-white px-4 py-3 text-sm font-semibold text-navy-deep transition hover:border-teal/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-55"
               >
-                <GoogleIcon /> Continue with Google
+                {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
+                {googleEnabled ? "Continue with Google" : "Google sign-in coming soon"}
               </button>
 
               <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="h-px flex-1 bg-border" /> or email{" "}
-                <div className="h-px flex-1 bg-border" />
+                <div className="h-px flex-1 bg-border" /> or use email <div className="h-px flex-1 bg-border" />
               </div>
+
+              {inlineMessage && (
+                <div className="mb-4 rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm text-foreground" role="status" aria-live="polite">
+                  {inlineMessage}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-3">
                 {mode === "signup" && (
                   <Field
                     icon={UserIcon}
                     autoComplete="name"
-                    placeholder="Display name (e.g. Tara V.)"
+                    placeholder="Display name"
                     value={displayName}
                     onChange={setDisplayName}
+                    required
                   />
                 )}
                 <Field
                   icon={Mail}
                   type="email"
                   autoComplete="email"
-                  placeholder="you@school.edu"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={setEmail}
                   required
@@ -144,7 +211,7 @@ function AuthPage() {
                   icon={Lock}
                   type="password"
                   autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  placeholder="Password (min. 8 characters)"
+                  placeholder="Password — at least 8 characters"
                   value={password}
                   onChange={setPassword}
                   required
@@ -152,7 +219,7 @@ function AuthPage() {
                 />
 
                 {mode === "signup" && (
-                  <label className="flex items-start gap-2 text-xs text-muted-foreground pt-1">
+                  <label className="flex items-start gap-2 pt-1 text-xs text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={agreed}
@@ -161,38 +228,23 @@ function AuthPage() {
                     />
                     <span>
                       I agree to the{" "}
-                      <Link to="/advisors" className="text-teal font-semibold underline">
+                      <Link to="/advisors" className="font-semibold text-teal underline underline-offset-2">
                         community rules
                       </Link>{" "}
-                      and understand that messages with advisors are educational and not legal
-                      advice.
+                      and understand that the service provides educational information, not legal advice.
                     </span>
                   </label>
                 )}
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-mesh text-white px-4 py-2.5 text-sm font-semibold shadow-glow hover:opacity-90 disabled:opacity-50"
+                  disabled={busy}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50"
                 >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="h-4 w-4" />
-                  )}
-                  {mode === "signup" ? "Create account" : "Sign in"}
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {mode === "signup" ? "Create account" : "Sign in securely"}
                 </button>
               </form>
-
-              <button
-                type="button"
-                onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-                className="mt-5 w-full text-center text-xs text-muted-foreground hover:text-foreground"
-              >
-                {mode === "signup"
-                  ? "Already have an account? Sign in"
-                  : "New here? Create an account"}
-              </button>
             </div>
           </div>
         </Section>
@@ -222,7 +274,7 @@ function Field({
 }) {
   return (
     <div className="relative">
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <input
         type={type}
         value={value}
@@ -231,7 +283,7 @@ function Field({
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
-        className="w-full rounded-lg border border-border bg-background pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal/40"
+        className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-teal/40"
       />
     </div>
   );
@@ -239,23 +291,11 @@ function Field({
 
 function GoogleIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.57c2.09-1.93 3.27-4.76 3.27-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.76c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.28-1.93-6.14-4.53H2.18v2.84A11 11 0 0 0 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.86 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.36-2.11V7.05H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.95l3.68-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.07.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.68 2.84C6.72 7.31 9.14 5.38 12 5.38z"
-      />
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.57c2.09-1.93 3.27-4.76 3.27-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.76c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.28-1.93-6.14-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+      <path fill="#FBBC05" d="M5.86 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.36-2.11V7.05H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.95l3.68-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.07.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.68 2.84C6.72 7.31 9.14 5.38 12 5.38z" />
     </svg>
   );
 }
