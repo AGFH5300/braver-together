@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
+import { consumeAiAllowance } from "./ai-rate-limit.server";
 import { MAX_CONTRACT_CHARACTERS } from "./decoder.constants";
 import { createAiProvider } from "./ai-provider.server";
 
@@ -19,47 +20,41 @@ const GeneratedAnalysisSchema = z.object({
 
 export type ContractAnalysis = z.infer<typeof GeneratedAnalysisSchema> & {
   highRiskCount: number;
+  remainingToday: number;
 };
 
-const Input = z.object({
-  text: z.string().trim().min(20).max(MAX_CONTRACT_CHARACTERS),
-});
+const Input = z.object({ text: z.string().trim().min(20).max(MAX_CONTRACT_CHARACTERS) });
 
 export const analyzeContract = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }): Promise<ContractAnalysis> => {
-    const apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
-    const modelName = process.env.AI_MODEL;
+    const apiKey = process.env.DECODER_AI_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
+    const modelName = process.env.DECODER_AI_MODEL || process.env.AI_MODEL;
+    if (!apiKey || !modelName) {
+      throw new Error("The Contract Decoder code is ready, but a free AI API key and model have not been configured yet.");
+    }
 
-    if (!apiKey) throw new Error("Missing AI_API_KEY or OPENAI_API_KEY");
-    if (!modelName) throw new Error("Missing AI_MODEL");
-
+    const allowance = await consumeAiAllowance({ feature: "decoder", dailyLimit: 10 });
     const provider = createAiProvider({
       apiKey,
-      baseUrl: process.env.AI_BASE_URL,
-      supportsStructuredOutputs: process.env.AI_STRUCTURED_OUTPUTS !== "false",
+      baseUrl: process.env.DECODER_AI_BASE_URL || process.env.AI_BASE_URL,
+      supportsStructuredOutputs: (process.env.DECODER_AI_STRUCTURED_OUTPUTS || process.env.AI_STRUCTURED_OUTPUTS) !== "false",
     });
 
     const { output } = await generateText({
       model: provider(modelName),
       output: Output.object({ schema: GeneratedAnalysisSchema }),
-      maxOutputTokens: 2_500,
-      system: `You are a legal-literacy assistant for teens ages 12–18. Analyze the provided Terms of Service, Privacy Policy, or digital contract across the entire supplied text.
+      maxOutputTokens: 2_200,
+      temperature: 0.1,
+      system: `You are a legal-literacy assistant for teenagers. Analyze only the supplied Terms of Service, Privacy Policy, or digital contract. This is educational information, not legal advice.
 
-Return:
-- "summary": one short paragraph of 2–3 sentences explaining what the user is agreeing to.
-- "clauses": 5–12 of the most notable clauses across the whole document. For each clause return:
-  - "risk": "high" for significant rights loss, data selling, broad content licences, legal-right waivers, or arbitrary termination; "medium" for notable concerns; "low" for minor concerns; or "standard" for normal terms.
-  - "title": a short descriptive label.
-  - "quote": a verbatim excerpt under 200 characters, using ellipses if trimmed.
-  - "plainEnglish": 1–2 sentences understandable to a 14-year-old.
-
-Include 2–3 standard or low-risk clauses for context when the document contains them. Be accurate and calm rather than alarmist. Do not invent language that is not present in the supplied text.`,
+Return a two-to-three sentence summary and 5–12 notable clauses from across the supplied text. For each clause provide a risk level, short title, a verbatim excerpt under 200 characters, and a plain-English explanation understandable to a 14-year-old. Mark high risk only for significant rights loss, data sale, broad licences, legal-right waivers, or arbitrary termination. Include normal clauses for context. Do not invent missing wording, jurisdiction, consequences, or legal conclusions.`,
       prompt: `Contract text:\n\n${data.text}`,
     });
 
     return {
       ...output,
       highRiskCount: output.clauses.filter((clause) => clause.risk === "high").length,
+      remainingToday: allowance.remaining,
     };
   });
