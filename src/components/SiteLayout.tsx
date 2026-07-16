@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Heart, LogIn, LogOut, Menu, MessageCircle, User as UserIcon, X } from "lucide-react";
+import { CalendarDays, Heart, LogIn, LogOut, Menu, MessageCircle, User as UserIcon, UserRoundPlus, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -30,14 +30,20 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
 
   if (!user) {
     return (
-      <Link to="/auth" onClick={onNavigate} className="inline-flex items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90">
-        <LogIn className="h-3.5 w-3.5" /> Sign in
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link to="/advisor-signup" onClick={onNavigate} className="inline-flex items-center gap-1.5 rounded-full border border-teal/30 bg-teal/5 px-3 py-2 text-xs font-semibold text-teal transition hover:bg-teal/10">
+          <UserRoundPlus className="h-3.5 w-3.5" /> Become an Advisor
+        </Link>
+        <Link to="/auth" onClick={onNavigate} className="inline-flex items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90">
+          <LogIn className="h-3.5 w-3.5" /> Sign in
+        </Link>
+      </div>
     );
   }
 
   return (
     <div className="flex items-center gap-1">
+      <Link to="/advisor-application" onClick={onNavigate} title="Advisor application" aria-label="Advisor application" className="rounded-md p-2 hover:bg-secondary"><UserRoundPlus className="h-4 w-4" /></Link>
       <Link to="/messages" search={{ c: undefined }} onClick={onNavigate} title="Messages" aria-label="Messages" className="rounded-md p-2 hover:bg-secondary"><MessageCircle className="h-4 w-4" /></Link>
       <Link to="/meetings" onClick={onNavigate} title="Meetings" aria-label="Meetings" className="rounded-md p-2 hover:bg-secondary"><CalendarDays className="h-4 w-4" /></Link>
       <Link to="/profile" onClick={onNavigate} title="Profile" aria-label="Profile" className="rounded-md p-2 hover:bg-secondary"><UserIcon className="h-4 w-4" /></Link>
@@ -89,7 +95,10 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               {nav.map((item) => (
                 <Link key={item.to} to={item.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary">{item.label}</Link>
               ))}
-              <Link to="/decoder" onClick={() => setOpen(false)} className="mt-2 inline-flex items-center justify-center rounded-full bg-mesh px-4 py-2.5 text-sm font-semibold text-white">Contract Decoder</Link>
+              <Link to="/advisor-signup" onClick={() => setOpen(false)} className="mt-2 inline-flex items-center justify-center gap-2 rounded-full border border-teal/30 bg-teal/5 px-4 py-2.5 text-sm font-semibold text-teal">
+                <UserRoundPlus className="h-4 w-4" /> Become an Advisor
+              </Link>
+              <Link to="/decoder" onClick={() => setOpen(false)} className="mt-1 inline-flex items-center justify-center rounded-full bg-mesh px-4 py-2.5 text-sm font-semibold text-white">Contract Decoder</Link>
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><span className="text-xs text-muted-foreground">Account</span><AuthControls onNavigate={() => setOpen(false)} /></div>
             </div>
           </div>
@@ -99,7 +108,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           <div><div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div><p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p></div>
-          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><ul className="space-y-2 text-sm text-white/70">{nav.slice(1).map((item) => <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>)}</ul></div>
+          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><ul className="space-y-2 text-sm text-white/70">{nav.slice(1).map((item) => <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>)}<li><Link to="/advisor-signup" className="inline-flex items-center gap-1.5 font-semibold text-teal-soft hover:text-white"><UserRoundPlus className="h-3.5 w-3.5" /> Volunteer as an Advisor</Link></li></ul></div>
           <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4><p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p></div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-white/55">© {new Date().getFullYear()} BraverTogether · Digital Legal Literacy Initiative</div>
