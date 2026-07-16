@@ -81,14 +81,14 @@ function stripCommentHtml(value: string): string {
 }
 
 export const getYouTubeComments = createServerFn({ method: "GET" })
-  .inputValidator((value: unknown) => CommentsInput.parse(value))
+  .validator((value: unknown) => CommentsInput.parse(value))
   .handler(async ({ data }) => {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (!apiKey) {
       return {
         configured: false as const,
         comments: [] as YouTubeComment[],
-        message: "YouTube comments will appear after a YouTube Data API key is configured.",
+        message: "Comments are not available on this site yet.",
       };
     }
 
@@ -108,8 +108,8 @@ export const getYouTubeComments = createServerFn({ method: "GET" })
     const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
     if (!response.ok) {
       const message = response.status === 403
-        ? "Comments are unavailable for this video or the YouTube API key is not enabled."
-        : `YouTube returned ${response.status}.`;
+        ? "Comments are unavailable for this video."
+        : "Comments could not be loaded right now.";
       return { configured: true as const, comments: [] as YouTubeComment[], message };
     }
 
