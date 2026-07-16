@@ -1,17 +1,32 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
-import { AlertTriangle, MessageCircle, ShieldCheck, Lock, Users, BrainCircuit, Copyright, Globe, FileText, ServerCog, Calendar, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  BrainCircuit,
+  Calendar,
+  CheckCircle2,
+  Clock3,
+  Loader2,
+  MessageCircle,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  UserRoundCheck,
+} from "lucide-react";
 import { toast } from "sonner";
+import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { createSupportRequest } from "@/lib/support.functions";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/advisors")({
   head: () => ({
     meta: [
       { title: "Ask an Advisor — BraverTogether" },
-      { name: "description", content: "Connect with law students, academics and legal professionals who volunteer their time to help teens understand digital law." },
+      { name: "description", content: "Send a digital-law question to a volunteer advisor. A limited educational AI helper is available only when no human advisor is online." },
       { property: "og:title", content: "Ask an Advisor — BraverTogether" },
-      { property: "og:description", content: "Free, educational guidance from volunteer legal advisors." },
+      { property: "og:description", content: "Human-first educational guidance about digital law and online rights." },
     ],
   }),
   component: Advisors,
@@ -25,67 +40,78 @@ type AdvisorProfile = {
   focus_areas: string[];
   calendly_url: string | null;
   accepting_messages: boolean;
+  availability_status: "available" | "busy" | "offline";
+  last_seen_at: string | null;
 };
 
-const advisors = [
-  { n: 1, icon: Lock, focus: ["Data Privacy & Personal Information", "Social Media Platform Policies", "Digital Footprints", "Children's Online Privacy Rights", "Data Collection Practices"], quote: "Helping teens understand what happens to their data online and what rights they have over it." },
-  { n: 2, icon: FileText, focus: ["Terms & Conditions", "Privacy Policies", "User Agreements", "Subscription Contracts", "Consumer Rights in Digital Services"], quote: "Making legal fine print understandable before you click 'I Agree'." },
-  { n: 3, icon: ShieldCheck, focus: ["Cyberbullying & Online Harassment", "Digital Safety", "Reporting Mechanisms", "School Technology Policies", "Online Conduct Regulations"], quote: "Helping young people navigate difficult online situations and understand available protections." },
-  { n: 4, icon: BrainCircuit, focus: ["Artificial Intelligence & Emerging Technology", "AI Ethics", "Algorithmic Decision-Making", "Generative AI Tools", "Future Technology Regulation"], quote: "Explaining how rapidly changing technologies intersect with law and society." },
-  { n: 5, icon: Copyright, focus: ["Intellectual Property", "Copyright", "Content Creation", "Influencer & Creator Rights", "Fair Use Principles"], quote: "Supporting young creators in understanding ownership and responsible content use online." },
-  { n: 6, icon: ServerCog, focus: ["Cybersecurity Law", "Online Fraud & Scams", "Digital Risk Awareness", "Account Security", "Responsible Technology Use"], quote: "Helping teens stay informed about legal and practical issues related to online security." },
-  { n: 7, icon: Globe, focus: ["International Digital Law", "Cross-Border Internet Regulation", "Platform Governance", "Technology Policy", "Comparative Digital Rights"], quote: "Exploring how different countries approach the rights and responsibilities of internet users." },
-  { n: 8, icon: Users, focus: ["Technology Law Research", "Digital Rights Advocacy", "Public Policy", "Internet Governance", "Youth Rights Online"], quote: "Connecting legal developments to the everyday experiences of young people online." },
-];
+const topics = [
+  ["privacy", "Privacy & personal data"],
+  ["social-media", "Social media and platform rules"],
+  ["contracts", "Terms, subscriptions and online contracts"],
+  ["safety", "Online safety, scams or cyberbullying"],
+  ["ai", "AI, deepfakes or algorithms"],
+  ["copyright", "Copyright and creator rights"],
+  ["general", "Something else"],
+] as const;
 
 function Advisors() {
   const navigate = useNavigate();
-  const [verified, setVerified] = useState<AdvisorProfile[]>([]);
-  const [loadingVerified, setLoadingVerified] = useState(true);
-  const [startingWith, setStartingWith] = useState<string | null>(null);
+  const createRequest = useServerFn(createSupportRequest);
+  const [advisors, setAdvisors] = useState<AdvisorProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAdvisor, setSelectedAdvisor] = useState<AdvisorProfile | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [topic, setTopic] = useState<(typeof topics)[number][0]>("general");
+  const [message, setMessage] = useState("");
+  const [allowAi, setAllowAi] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("id, display_name, headline, bio, focus_areas, calendly_url, accepting_messages")
-      .eq("is_advisor", true)
-      .eq("is_public", true)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        setVerified((data ?? []) as AdvisorProfile[]);
-        setLoadingVerified(false);
+    supabase.from("profiles")
+      .select("id, display_name, headline, bio, focus_areas, calendly_url, accepting_messages, availability_status, last_seen_at")
+      .eq("is_advisor", true).eq("is_public", true).order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) toast.error(error.message);
+        setAdvisors((data ?? []) as AdvisorProfile[]);
+        setLoading(false);
       });
   }, []);
 
-  async function startConversation(advisorId: string) {
-    setStartingWith(advisorId);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      navigate({ to: "/auth" });
-      return;
-    }
-    // Try existing
-    const { data: existing } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("teen_id", u.user.id)
-      .eq("advisor_id", advisorId)
-      .maybeSingle();
-    let id = existing?.id;
-    if (!id) {
-      const { data, error } = await supabase
-        .from("conversations")
-        .insert({ teen_id: u.user.id, advisor_id: advisorId })
-        .select("id")
-        .single();
-      if (error) {
-        toast.error(error.message);
-        setStartingWith(null);
+  const availableCount = useMemo(
+    () => advisors.filter((advisor) => advisor.accepting_messages && advisor.availability_status === "available").length,
+    [advisors],
+  );
+
+  function openRequest(advisor: AdvisorProfile | null) {
+    setSelectedAdvisor(advisor);
+    setFormOpen(true);
+    if (advisor) setSubject(`Question for ${advisor.display_name}`);
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        navigate({ to: "/auth" });
         return;
       }
-      id = data.id;
+      const result = await createRequest({ data: {
+        subject,
+        topic,
+        message,
+        advisorId: selectedAdvisor?.id ?? null,
+        allowAiFallback: !selectedAdvisor && allowAi,
+      } });
+      toast.success(selectedAdvisor ? "Conversation started" : "Your request is in the advisor queue");
+      navigate({ to: "/messages", search: { c: result.id } });
+    } catch (error) {
+      toast.error((error as Error).message || "Could not submit your question");
+    } finally {
+      setSubmitting(false);
     }
-    navigate({ to: "/messages", search: { c: id } });
   }
 
   return (
@@ -93,156 +119,148 @@ function Advisors() {
       <div className="bg-hero relative overflow-hidden">
         <div className="absolute inset-0 dot-pattern opacity-50" />
         <Section className="py-24 relative">
-          <Eyebrow>Ask an Advisor</Eyebrow>
-          <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">Have a question about digital law?</h1>
+          <Eyebrow><MessageCircle className="h-3.5 w-3.5" /> Ask an Advisor</Eyebrow>
+          <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">A proper support inbox for your digital-law questions.</h1>
           <p className="mt-6 text-navy-deep/70 max-w-2xl text-lg">
-            Our advisors are law students, academics, and legal professionals who volunteer their time to help teens better understand digital law and online rights. Free, educational, and judgment-free.
+            Start one private educational conversation, follow replies in real time, and keep everything in one place. Human advisors always take priority.
           </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button onClick={() => openRequest(null)} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
+              <Send className="h-4 w-4" /> Ask any advisor
+            </button>
+            <button onClick={() => navigate({ to: "/messages" })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
+              <MessageCircle className="h-4 w-4" /> Open my inbox
+            </button>
+          </div>
         </Section>
       </div>
 
-      {/* Disclaimer - prominent */}
       <Section className="py-10">
-        <div className="rounded-2xl border-2 border-warn/40 bg-warn/5 p-6 sm:p-8">
+        <div className="rounded-2xl border-2 border-warn/35 bg-warn/5 p-6 sm:p-8">
           <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-xl bg-warn/20 text-warn flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
+            <AlertTriangle className="mt-1 h-6 w-6 shrink-0 text-warn" />
             <div>
-              <div className="text-xs uppercase tracking-widest font-bold text-warn mb-2">Important Disclaimer</div>
-              <h2 className="font-display text-2xl font-bold mb-3">This service is educational only — not legal advice.</h2>
-              <div className="text-sm text-muted-foreground space-y-3 leading-relaxed">
-                <p>The Ask an Advisor service is provided for educational and informational purposes only. Information shared by advisors does <strong className="text-foreground">not constitute legal advice</strong> and should not be relied upon as a substitute for advice from a qualified lawyer licensed in your jurisdiction.</p>
-                <p>Using this service does not create an attorney-client relationship, solicitor-client relationship, or any other professional legal relationship between users and advisors.</p>
-                <p>Advisors may include law students, academics, researchers, and legal professionals volunteering their time. While every effort is made to provide accurate and useful information, we cannot guarantee the completeness, accuracy, or applicability of any response to your specific circumstances.</p>
-                <p><strong className="text-foreground">Do not share confidential, sensitive, or personally identifying information when submitting questions.</strong> By using this service, you acknowledge and agree that all responses are educational in nature and should not be considered formal legal counsel.</p>
-              </div>
+              <h2 className="font-display text-2xl font-bold">Educational support, not legal advice.</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Do not share passwords, financial details, addresses, school records, names of other minors, or confidential documents. For emergencies, immediate danger, abuse, criminal allegations, or urgent legal deadlines, contact a trusted adult and an appropriate qualified professional.
+              </p>
             </div>
           </div>
         </div>
       </Section>
 
-      {/* How it works */}
       <Section className="py-10">
-        <Eyebrow>How it works</Eyebrow>
-        <h2 className="mt-4 text-3xl font-bold mb-8">Four simple steps.</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { n: 1, t: "Browse Advisors", d: "Find someone whose area of expertise matches your question." },
-            { n: 2, t: "Submit Your Question", d: "Send a brief description with as much context as possible." },
-            { n: 3, t: "Receive a Response", d: "An advisor will provide educational guidance and resources." },
-            { n: 4, t: "Request a Call (Optional)", d: "Where available, follow up with a virtual conversation." },
-          ].map((s) => (
-            <div key={s.n} className="rounded-2xl border border-border bg-card p-5">
-              <div className="text-teal font-display text-3xl font-bold mb-2">0{s.n}</div>
-              <div className="font-semibold mb-1">{s.t}</div>
-              <div className="text-xs text-muted-foreground">{s.d}</div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Rules */}
-      <Section className="py-10">
-        <Eyebrow>Rules & expectations</Eyebrow>
-        <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { t: "Be Respectful", d: "Treat advisors and community members with courtesy and professionalism." },
-            { t: "Ask Genuine Questions", d: "Questions should relate to digital law, online rights, technology policy, or privacy." },
-            { t: "Protect Your Privacy", d: "Do not submit passwords, financial information, or identifying details about yourself or others." },
-            { t: "No Emergency Situations", d: "For urgent legal or safety issues, this platform is not an appropriate substitute." },
-            { t: "Educational Use Only", d: "Responses help you learn — they don't resolve disputes or provide representation." },
-            { t: "One Question at a Time", d: "Keep submissions focused so we can serve everyone fairly." },
-          ].map((r) => (
-            <div key={r.t} className="rounded-xl border border-border bg-card p-4">
-              <div className="font-semibold text-sm mb-1">{r.t}</div>
-              <div className="text-xs text-muted-foreground">{r.d}</div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Verified advisors from DB */}
-      <Section className="py-10">
-        <Eyebrow>Verified advisors</Eyebrow>
-        <h2 className="mt-4 text-3xl sm:text-4xl font-bold">Message an advisor directly.</h2>
-        <p className="mt-3 text-muted-foreground text-sm max-w-2xl">Sign in, send a message, and book a call when they're free. Advisors below have published their profiles and accept new conversations.</p>
-
-        <div className="mt-8 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {loadingVerified ? (
-            <div className="col-span-full py-12 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : verified.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-              No advisor profiles published yet. Advisors: sign in and head to your profile to publish.
-            </div>
-          ) : (
-            verified.map((a) => (
-              <div key={a.id} className="rounded-2xl border border-border bg-card p-5 hover:border-teal/40 hover:shadow-card transition flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-full bg-mesh text-white flex items-center justify-center font-display font-bold">
-                    {a.display_name?.[0]?.toUpperCase() ?? "A"}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-display font-bold truncate">{a.display_name}</div>
-                    {a.headline && <div className="text-xs text-muted-foreground truncate">{a.headline}</div>}
-                  </div>
-                </div>
-                {a.bio && <p className="text-sm text-muted-foreground mb-3 line-clamp-3">{a.bio}</p>}
-                {a.focus_areas?.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {a.focus_areas.slice(0, 4).map((f) => (
-                      <span key={f} className="text-[10px] uppercase tracking-wider rounded-full bg-teal/10 text-teal border border-teal/20 px-2 py-0.5">{f}</span>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-auto flex gap-2">
-                  <button
-                    onClick={() => startConversation(a.id)}
-                    disabled={!a.accepting_messages || startingWith === a.id}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-navy text-white px-3 py-2 text-xs font-semibold hover:opacity-90 transition disabled:opacity-50"
-                  >
-                    {startingWith === a.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                    Message
-                  </button>
-                  {a.calendly_url && (
-                    <a href={a.calendly_url} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-secondary">
-                      <Calendar className="h-3.5 w-3.5" /> Book call
-                    </a>
-                  )}
-                </div>
+        <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
+          <div>
+            <Eyebrow>Human advisors</Eyebrow>
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="text-3xl sm:text-4xl font-bold">Choose someone, or join the general queue.</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Availability is currently controlled manually by each advisor. Scheduled hours can be added later.</p>
               </div>
-            ))
-          )}
-        </div>
-      </Section>
-
-      {/* Topic coverage (static) */}
-      <div className="bg-secondary/40 border-y border-border">
-        <Section>
-          <Eyebrow>Topics we cover</Eyebrow>
-          <h2 className="mt-4 text-3xl sm:text-4xl font-bold">What our advisors can help with.</h2>
-          <p className="mt-3 text-muted-foreground text-sm">These are the areas of digital law our volunteer panel specialises in.</p>
-
-          <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {advisors.map((a) => (
-              <div key={a.n} className="rounded-2xl border border-border bg-card p-5 flex flex-col">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-12 w-12 rounded-xl bg-mesh flex items-center justify-center text-white">
-                    <a.icon className="h-5 w-5" />
-                  </div>
-                  <div className="text-[10px] uppercase tracking-widest text-teal font-bold">Topic area {String(a.n).padStart(2, "0")}</div>
-                </div>
-                <ul className="text-xs space-y-1 mb-4 flex-1">
-                  {a.focus.map((f) => (
-                    <li key={f} className="text-muted-foreground">· {f}</li>
-                  ))}
-                </ul>
-                <p className="text-xs italic text-muted-foreground border-l-2 border-teal/40 pl-3">"{a.quote}"</p>
+              <div className={cn("rounded-full px-4 py-2 text-sm font-semibold", availableCount ? "bg-teal/10 text-teal" : "bg-secondary text-muted-foreground")}>
+                {availableCount ? `${availableCount} available now` : "No advisor marked available"}
               </div>
-            ))}
+            </div>
+
+            <div className="mt-8 grid md:grid-cols-2 gap-5">
+              {loading ? (
+                <div className="col-span-full py-16 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-teal" /></div>
+              ) : advisors.length === 0 ? (
+                <div className="col-span-full rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+                  <UserRoundCheck className="mx-auto h-9 w-9 text-muted-foreground/50" />
+                  <h3 className="mt-4 text-xl font-bold">Advisor profiles are being prepared.</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">You can still submit a question to the general queue.</p>
+                  <button onClick={() => openRequest(null)} className="mt-5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Submit a question</button>
+                </div>
+              ) : advisors.map((advisor) => (
+                <AdvisorCard key={advisor.id} advisor={advisor} onMessage={() => openRequest(advisor)} />
+              ))}
+            </div>
           </div>
-        </Section>
-      </div>
+
+          <aside className="sticky top-24 rounded-3xl border border-border bg-card p-6 shadow-card">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal/10 text-teal"><BrainCircuit className="h-6 w-6" /></div>
+            <h2 className="mt-4 font-display text-2xl font-bold">Limited AI fallback</h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              When no human advisor is available, an optional AI helper can explain basic terms, protect your privacy, and help prepare your question. It cannot give legal advice or replace the human queue.
+            </p>
+            <ul className="mt-5 space-y-3 text-sm">
+              {[
+                "Only appears for unassigned requests",
+                "Stops being available when an advisor joins",
+                "Keeps the conversation flagged for human review",
+                "Has a daily usage limit to keep the service free",
+              ].map((item) => <li key={item} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal" /> {item}</li>)}
+            </ul>
+            <button onClick={() => openRequest(null)} className="mt-6 w-full rounded-full bg-mesh px-5 py-3 text-sm font-semibold text-white">Start a support request</button>
+          </aside>
+        </div>
+      </Section>
+
+      {formOpen && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-navy-deep/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.currentTarget === event.target) setFormOpen(false); }}>
+          <form onSubmit={submit} className="mx-auto my-8 max-w-xl rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-widest text-teal">New support request</div>
+                <h2 className="mt-2 text-2xl font-bold">{selectedAdvisor ? `Message ${selectedAdvisor.display_name}` : "Ask the advisor team"}</h2>
+              </div>
+              <button type="button" onClick={() => setFormOpen(false)} className="rounded-full border border-border px-3 py-1.5 text-sm">Close</button>
+            </div>
+
+            <label className="mt-6 block text-sm font-semibold">Subject
+              <input value={subject} onChange={(event) => setSubject(event.target.value)} minLength={5} maxLength={120} required className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 font-normal outline-none focus:ring-2 focus:ring-teal/30" placeholder="What do you need help understanding?" />
+            </label>
+            <label className="mt-5 block text-sm font-semibold">Topic
+              <select value={topic} onChange={(event) => setTopic(event.target.value as typeof topic)} className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 font-normal outline-none focus:ring-2 focus:ring-teal/30">
+                {topics.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="mt-5 block text-sm font-semibold">Your question
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} minLength={10} maxLength={4000} required rows={7} className="mt-2 w-full resize-y rounded-xl border border-border bg-background px-4 py-3 font-normal leading-relaxed outline-none focus:ring-2 focus:ring-teal/30" placeholder="Give enough context to understand the issue, but remove names and private information." />
+              <span className="mt-1 block text-right text-xs font-normal text-muted-foreground">{message.length}/4000</span>
+            </label>
+
+            {!selectedAdvisor && (
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-secondary/40 p-4">
+                <input type="checkbox" checked={allowAi} onChange={(event) => setAllowAi(event.target.checked)} className="mt-1" />
+                <span><span className="block text-sm font-semibold">Allow the limited AI helper while waiting</span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">It will only be offered when nobody is marked available, and your request stays in the human queue.</span></span>
+              </label>
+            )}
+
+            <button type="submit" disabled={submitting || subject.trim().length < 5 || message.trim().length < 10} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white disabled:opacity-50">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {submitting ? "Submitting…" : "Submit securely"}
+            </button>
+          </form>
+        </div>
+      )}
     </SiteLayout>
+  );
+}
+
+function AdvisorCard({ advisor, onMessage }: { advisor: AdvisorProfile; onMessage: () => void }) {
+  const status = advisor.availability_status;
+  return (
+    <article className="flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:border-teal/40 hover:shadow-card">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mesh font-display font-bold text-white">{advisor.display_name?.[0]?.toUpperCase() || "A"}</div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate font-display text-lg font-bold">{advisor.display_name}</h3>
+          <p className="truncate text-xs text-muted-foreground">{advisor.headline || "Volunteer digital-law advisor"}</p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs">
+            <span className={cn("h-2 w-2 rounded-full", status === "available" ? "bg-teal" : status === "busy" ? "bg-warn" : "bg-muted-foreground/40")} />
+            <span className="capitalize text-muted-foreground">{status}</span>
+          </div>
+        </div>
+      </div>
+      {advisor.bio && <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{advisor.bio}</p>}
+      {advisor.focus_areas?.length > 0 && <div className="mt-4 flex flex-wrap gap-1.5">{advisor.focus_areas.slice(0, 4).map((focus) => <span key={focus} className="rounded-full bg-teal/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal">{focus}</span>)}</div>}
+      <div className="mt-auto flex gap-2 pt-5">
+        <button onClick={onMessage} disabled={!advisor.accepting_messages} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle className="h-3.5 w-3.5" /> Message</button>
+        {advisor.calendly_url && <a href={advisor.calendly_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-full border border-border px-3 text-muted-foreground hover:text-foreground" title="Book a call"><Calendar className="h-4 w-4" /></a>}
+      </div>
+    </article>
   );
 }
