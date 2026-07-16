@@ -17,7 +17,7 @@ const CreateRequestInput = z.object({
 
 export const createSupportRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) => CreateRequestInput.parse(value))
+  .validator((value: unknown) => CreateRequestInput.parse(value))
   .handler(async ({ data, context }) => {
     if (data.advisorId) {
       const { data: advisor } = await context.supabase
@@ -62,7 +62,7 @@ const ConversationInput = z.object({ conversationId: z.string().uuid() });
 
 export const claimConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) => ConversationInput.parse(value))
+  .validator((value: unknown) => ConversationInput.parse(value))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: advisor } = await supabaseAdmin
@@ -96,7 +96,7 @@ const AvailabilityInput = z.object({ status: z.enum(["available", "busy", "offli
 
 export const setAdvisorAvailability = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) => AvailabilityInput.parse(value))
+  .validator((value: unknown) => AvailabilityInput.parse(value))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("profiles").update({
@@ -109,7 +109,7 @@ export const setAdvisorAvailability = createServerFn({ method: "POST" })
 
 export const closeConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) => ConversationInput.parse(value))
+  .validator((value: unknown) => ConversationInput.parse(value))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: conversation } = await supabaseAdmin.from("conversations")
@@ -131,7 +131,7 @@ const AiInput = z.object({
 
 export const askSupportAi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((value: unknown) => AiInput.parse(value))
+  .validator((value: unknown) => AiInput.parse(value))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: conversation } = await supabaseAdmin.from("conversations")
@@ -151,7 +151,7 @@ export const askSupportAi = createServerFn({ method: "POST" })
     const apiKey = process.env.SUPPORT_AI_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     const modelName = process.env.SUPPORT_AI_MODEL || process.env.AI_MODEL;
     if (!apiKey || !modelName) {
-      return { configured: false as const, message: "The limited AI helper is ready in the code but has not been connected to a free AI key yet." };
+      return { configured: false as const, message: "The AI helper is temporarily unavailable. Your request remains in the advisor queue." };
     }
 
     const allowance = await consumeAiAllowance({ feature: "support", userId: context.userId, dailyLimit: 20 });
