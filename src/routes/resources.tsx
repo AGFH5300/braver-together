@@ -1,135 +1,316 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useMemo, useState } from "react";
+import {
+  BrainCircuit,
+  ExternalLink,
+  Lock,
+  MessageCircle,
+  Play,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Video,
+} from "lucide-react";
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
-import { Download, Star, ShieldCheck, Users, Lock, FileText, BrainCircuit, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  getResourceLibrary,
+  getYouTubeComments,
+  type ResourceVideo,
+  type YouTubeComment,
+} from "@/lib/content.functions";
 
 export const Route = createFileRoute("/resources")({
   head: () => ({
     meta: [
-      { title: "Resource Library — BraverTogether" },
-      { name: "description", content: "Free guides and PDFs on privacy, social media law, digital contracts, online safety, AI, and digital rights — written for teens." },
-      { property: "og:title", content: "Resource Library — BraverTogether" },
-      { property: "og:description", content: "Plain-English guides on the laws that shape your digital life." },
+      { title: "Video Resource Library — BraverTogether" },
+      {
+        name: "description",
+        content:
+          "Free teen-friendly videos on privacy, social media law, digital contracts, online safety, AI, and digital rights.",
+      },
+      { property: "og:title", content: "Video Resource Library — BraverTogether" },
+      { property: "og:description", content: "Understand your digital rights through short, practical videos." },
     ],
   }),
+  loader: () => getResourceLibrary(),
   component: Resources,
 });
 
-const categories = [
-  { id: "all", label: "All", icon: FileText },
-  { id: "privacy", label: "Privacy & Data", icon: Lock },
-  { id: "social", label: "Social Media Law", icon: Users },
-  { id: "contracts", label: "Digital Contracts", icon: Scale },
-  { id: "safety", label: "Online Safety", icon: ShieldCheck },
-  { id: "ai", label: "AI & Emerging Tech", icon: BrainCircuit },
-  { id: "rights", label: "Digital Rights", icon: FileText },
-];
-
-const pdfs = [
-  { cat: "privacy", n: 1, title: "Your Data, Your Rights", desc: "What personal data is, how companies collect it, why data has value, basic privacy rights." },
-  { cat: "privacy", n: 2, title: "What Apps Know About You", desc: "Location tracking, device permissions, data sharing, advertising profiles." },
-  { cat: "privacy", n: 3, title: "Can Social Media Platforms Track You?", desc: "Cookies, tracking pixels, cross-platform tracking, personalized ads." },
-  { cat: "social", n: 4, title: "Social Media and the Law", desc: "Platform rules, user responsibilities, account suspensions, content moderation." },
-  { cat: "social", n: 5, title: "Can Schools Monitor Your Online Activity?", desc: "School devices, school networks, student privacy, educational platforms." },
-  { cat: "social", n: 6, title: "Understanding Cyberbullying Laws", desc: "Legal definitions, reporting options, evidence collection, available protections." },
-  { cat: "contracts", n: 7, title: "Terms & Conditions Explained", desc: "Why they matter, common clauses, hidden permissions, things to look for." },
-  { cat: "contracts", n: 8, title: "The Teen's Guide to Privacy Policies", desc: "How to read policies, data collection clauses, red flags, questions to ask." },
-  { cat: "contracts", n: 9, title: "What Does \"I Agree\" Actually Mean?", desc: "Digital contracts, consent, user obligations, legal implications." },
-  { cat: "safety", n: 10, title: "Digital Safety Essentials", desc: "Passwords, multi-factor authentication, account protection, security basics." },
-  { cat: "safety", n: 11, title: "Online Scams and How to Spot Them", desc: "Phishing, fake giveaways, impersonation scams, fraud prevention." },
-  { cat: "ai", n: 12, title: "AI and Your Rights", desc: "What AI is, how AI uses data, ethical concerns, future regulations." },
-  { cat: "ai", n: 13, title: "Deepfakes, AI Images, and the Law", desc: "What deepfakes are, legal challenges, privacy concerns, responsible use." },
-  { cat: "rights", n: 14, title: "Your Rights Online", desc: "Freedom of expression, privacy, access to information, digital citizenship." },
-  { cat: "rights", n: 15, title: "A Beginner's Guide to Digital Law", desc: "Key legal concepts, major areas of digital law, why digital law matters, future trends." },
-];
+const categoryIcons = {
+  privacy: Lock,
+  social: Users,
+  contracts: ShieldCheck,
+  safety: ShieldCheck,
+  ai: BrainCircuit,
+  rights: Sparkles,
+} as const;
 
 function Resources() {
-  const [active, setActive] = useState("all");
-  const filtered = active === "all" ? pdfs : pdfs.filter((p) => p.cat === active);
+  const { categories, videos, commentsConfigured } = Route.useLoaderData();
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<ResourceVideo | null>(null);
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return videos.filter((video) => {
+      const categoryMatches = activeCategory === "all" || video.category_id === activeCategory;
+      const queryMatches =
+        !normalized ||
+        video.title.toLowerCase().includes(normalized) ||
+        video.description.toLowerCase().includes(normalized);
+      return categoryMatches && queryMatches;
+    });
+  }, [activeCategory, query, videos]);
 
   return (
     <SiteLayout>
       <div className="bg-hero relative overflow-hidden">
         <div className="absolute inset-0 dot-pattern opacity-50" />
         <Section className="py-24 relative">
-          <Eyebrow>Resource Library</Eyebrow>
-          <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">Free guides on the legal side of your digital life.</h1>
+          <Eyebrow><Video className="h-3.5 w-3.5" /> Video Resource Library</Eyebrow>
+          <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">
+            Digital law explained through videos you can actually follow.
+          </h1>
           <p className="mt-6 text-navy-deep/70 max-w-2xl text-lg">
-            No legal jargon. No prior experience required. Just straightforward explanations of the laws, rights, and systems that affect you online.
+            Short, practical lessons on privacy, contracts, online safety, AI and your rights. Videos will appear here as the BraverTogether series is published.
           </p>
         </Section>
       </div>
 
       <Section>
-        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-12">
+        <div className="grid md:grid-cols-3 gap-4 mb-10">
           {[
-            { t: "Understand Your Rights", d: "What protections exist for you online." },
-            { t: "Make Better Decisions", d: "Know what you're agreeing to." },
-            { t: "Stay Safe Online", d: "Spot scams, bullying, and privacy risks." },
-            { t: "Build Digital Literacy", d: "How tech, law and society interact." },
-            { t: "Prepare for the Future", d: "A life skill that matters more every year." },
-          ].map((b) => (
-            <div key={b.t} className="rounded-xl border border-border bg-card p-5">
-              <div className="text-sm font-semibold mb-1">{b.t}</div>
-              <div className="text-xs text-muted-foreground">{b.d}</div>
+            { t: "Watch at your pace", d: "Pause, replay and revisit any topic whenever you need it." },
+            { t: "Built for teens", d: "Clear explanations without assuming prior legal knowledge." },
+            { t: "Optional YouTube discussion", d: "Public video comments can appear here once the YouTube API is connected." },
+          ].map((item) => (
+            <div key={item.t} className="rounded-2xl border border-border bg-card p-5">
+              <div className="font-semibold mb-1">{item.t}</div>
+              <p className="text-sm text-muted-foreground">{item.d}</p>
             </div>
           ))}
         </div>
 
-        {/* Filter chips */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {categories.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActive(c.id)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                active === c.id ? "bg-navy text-white border-navy" : "bg-card border-border text-muted-foreground hover:border-teal/50 hover:text-foreground"
-              )}
-            >
-              <c.icon className="h-3.5 w-3.5" />
-              {c.label}
-            </button>
-          ))}
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between mb-8">
+          <div className="flex flex-wrap gap-2">
+            <FilterButton active={activeCategory === "all"} onClick={() => setActiveCategory("all")}>
+              <Video className="h-3.5 w-3.5" /> All videos
+            </FilterButton>
+            {categories.map((category) => {
+              const Icon = categoryIcons[category.id as keyof typeof categoryIcons] ?? Video;
+              return (
+                <FilterButton
+                  key={category.id}
+                  active={activeCategory === category.id}
+                  onClick={() => setActiveCategory(category.id)}
+                >
+                  <Icon className="h-3.5 w-3.5" /> {category.label}
+                </FilterButton>
+              );
+            })}
+          </div>
+
+          <label className="relative block w-full lg:w-80">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search videos"
+              className="w-full rounded-full border border-border bg-card py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-teal/30"
+            />
+          </label>
         </div>
 
-        {/* Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((p) => (
-            <ResourceCard key={p.n} pdf={p} />
-          ))}
-        </div>
+        {videos.length === 0 ? (
+          <ComingSoon />
+        ) : filtered.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center">
+            <Search className="mx-auto h-8 w-8 text-muted-foreground/50" />
+            <h2 className="mt-4 text-2xl font-bold">No videos match that search.</h2>
+            <button
+              onClick={() => { setQuery(""); setActiveCategory("all"); }}
+              className="mt-4 text-sm font-semibold text-teal hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filtered.map((video) => (
+              <VideoCard key={video.id} video={video} onSelect={() => setSelected(video)} />
+            ))}
+          </div>
+        )}
       </Section>
+
+      {selected && (
+        <VideoViewer
+          video={selected}
+          commentsConfigured={commentsConfigured}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </SiteLayout>
   );
 }
 
-function ResourceCard({ pdf }: { pdf: (typeof pdfs)[number] }) {
-  const [rating, setRating] = useState(0);
+function FilterButton({ active, onClick, children }: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="group rounded-2xl border border-border bg-card overflow-hidden hover:shadow-card hover:border-teal/40 transition flex flex-col">
-      <div className="relative h-32 bg-mesh flex items-center justify-center text-white">
-        <div className="absolute inset-0 grid-pattern opacity-30" />
-        <div className="relative text-center">
-          <div className="text-[10px] uppercase tracking-widest text-teal-soft">PDF {String(pdf.n).padStart(2, "0")}</div>
-          <FileText className="h-8 w-8 mx-auto mt-1 text-teal" />
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+        active
+          ? "border-navy bg-navy text-white"
+          : "border-border bg-card text-muted-foreground hover:border-teal/50 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ComingSoon() {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-10 sm:p-16 text-center">
+      <div className="absolute inset-0 dot-pattern opacity-25" />
+      <div className="relative mx-auto max-w-2xl">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-mesh text-white shadow-glow">
+          <Play className="h-7 w-7 fill-current" />
+        </div>
+        <h2 className="mt-6 text-3xl sm:text-4xl font-bold">The first video lessons are being produced.</h2>
+        <p className="mt-4 text-muted-foreground leading-relaxed">
+          The library and database are ready. Once a YouTube video is added and marked as published, it will automatically appear here with an embedded privacy-enhanced player.
+        </p>
+        <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-teal/10 px-4 py-2 text-sm font-semibold text-teal">
+          <Sparkles className="h-4 w-4" /> No placeholder PDFs or broken download buttons
         </div>
       </div>
-      <div className="p-5 flex flex-col flex-1">
-        <h3 className="font-display font-bold text-lg leading-tight mb-2">{pdf.title}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed mb-4 flex-1">{pdf.desc}</p>
-        <div className="flex items-center justify-between gap-2">
-          <button className="inline-flex items-center gap-1.5 rounded-full bg-navy text-white px-3 py-1.5 text-xs font-semibold hover:opacity-90">
-            <Download className="h-3.5 w-3.5" /> Download
-          </button>
-          <div className="flex items-center gap-0.5">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <button key={s} onClick={() => setRating(s)} aria-label={`Rate ${s}`}>
-                <Star className={cn("h-4 w-4 transition", s <= rating ? "fill-warn text-warn" : "text-muted-foreground/40")} />
-              </button>
-            ))}
+    </div>
+  );
+}
+
+function VideoCard({ video, onSelect }: { video: ResourceVideo; onSelect: () => void }) {
+  const thumbnail = video.thumbnail_url || `https://i.ytimg.com/vi/${video.youtube_video_id}/hqdefault.jpg`;
+  return (
+    <article className="group overflow-hidden rounded-2xl border border-border bg-card transition hover:border-teal/40 hover:shadow-card">
+      <button onClick={onSelect} className="relative block aspect-video w-full overflow-hidden bg-navy text-left">
+        <img src={thumbnail} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-navy-deep/15 transition group-hover:bg-navy-deep/30" />
+        <span className="absolute inset-0 m-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-navy shadow-lg">
+          <Play className="ml-1 h-5 w-5 fill-current" />
+        </span>
+        {video.duration_text && (
+          <span className="absolute bottom-3 right-3 rounded bg-black/75 px-2 py-1 text-xs font-semibold text-white">
+            {video.duration_text}
+          </span>
+        )}
+      </button>
+      <div className="p-5">
+        <h2 className="font-display text-xl font-bold leading-tight">{video.title}</h2>
+        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{video.description}</p>
+        <button onClick={onSelect} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-teal hover:underline">
+          Watch lesson <Play className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function VideoViewer({ video, commentsConfigured, onClose }: {
+  video: ResourceVideo;
+  commentsConfigured: boolean;
+  onClose: () => void;
+}) {
+  const loadComments = useServerFn(getYouTubeComments);
+  const [comments, setComments] = useState<YouTubeComment[] | null>(null);
+  const [commentMessage, setCommentMessage] = useState<string | null>(null);
+  const [loadingComments, setLoadingComments] = useState(false);
+
+  async function showComments() {
+    setLoadingComments(true);
+    try {
+      const result = await loadComments({ data: { videoId: video.youtube_video_id } });
+      setComments(result.comments);
+      setCommentMessage("message" in result ? result.message ?? null : null);
+    } catch {
+      setComments([]);
+      setCommentMessage("Comments could not be loaded right now.");
+    } finally {
+      setLoadingComments(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-navy-deep/85 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <div className="mx-auto my-6 max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-teal">Video lesson</div>
+            <h2 className="mt-1 text-2xl font-bold">{video.title}</h2>
           </div>
+          <button onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary">Close</button>
+        </div>
+
+        <div className="aspect-video bg-black">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${video.youtube_video_id}?rel=0`}
+            title={video.title}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+
+        <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[1fr_360px]">
+          <div>
+            <p className="leading-relaxed text-muted-foreground">{video.description}</p>
+            <a
+              href={`https://www.youtube.com/watch?v=${video.youtube_video_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-5 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:border-teal/50"
+            >
+              Open on YouTube <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+
+          <aside className="rounded-2xl border border-border bg-secondary/30 p-4">
+            <div className="flex items-center gap-2 font-semibold"><MessageCircle className="h-4 w-4 text-teal" /> YouTube discussion</div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Public comments are shown from YouTube and remain subject to YouTube moderation.
+            </p>
+
+            {comments === null ? (
+              <button
+                onClick={showComments}
+                disabled={loadingComments || !video.comments_enabled}
+                className="mt-4 w-full rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {loadingComments ? "Loading…" : commentsConfigured ? "Show top comments" : "Comments not connected yet"}
+              </button>
+            ) : comments.length === 0 ? (
+              <p className="mt-4 rounded-xl bg-card p-3 text-xs text-muted-foreground">{commentMessage || "No public comments are available."}</p>
+            ) : (
+              <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="rounded-xl border border-border bg-card p-3">
+                    <div className="text-xs font-semibold">{comment.author}</div>
+                    <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-muted-foreground">{comment.text}</p>
+                    {comment.likeCount > 0 && <div className="mt-2 text-[10px] text-muted-foreground">{comment.likeCount} likes</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
         </div>
       </div>
     </div>
