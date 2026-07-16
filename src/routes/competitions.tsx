@@ -1,89 +1,98 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Calendar, FileText, Sparkles, Trophy, Users } from "lucide-react";
+
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
-import { Trophy, Calendar, Users, Sparkles } from "lucide-react";
+import { getPublicCompetition } from "@/lib/competition.functions";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/competitions")({
   head: () => ({
     meta: [
-      { title: "Competitions — BraverTogether" },
-      { name: "description", content: "Essay competitions and events focused on digital rights — with cash prizes and recognition for teen participants." },
-      { property: "og:title", content: "Competitions — BraverTogether" },
-      { property: "og:description", content: "Put your knowledge to work. Current and upcoming competitions." },
+      { title: "Essay Competition — BraverTogether" },
+      { name: "description", content: "The BraverTogether digital-rights essay competition for students aged 12–18." },
+      { property: "og:title", content: "BraverTogether Digital Rights Essay Competition" },
+      { property: "og:description", content: "Research a digital-rights issue, develop your perspective and submit an original essay." },
     ],
   }),
+  loader: () => getPublicCompetition(),
   component: Competitions,
 });
 
 function Competitions() {
+  const competition = Route.useLoaderData();
+  const statusLabel = competition.acceptingSubmissions
+    ? "Submissions open"
+    : competition.status === "draft" ? "Details coming soon" : competition.status === "judging" ? "Judging in progress" : competition.status === "published" ? "Results published" : "Submissions closed";
+
   return (
     <SiteLayout>
-      <div className="bg-hero relative overflow-hidden">
+      <div className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 dot-pattern opacity-50" />
-        <Section className="py-24 relative">
-          <Eyebrow>Competitions & Events</Eyebrow>
-          <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">Put your knowledge to work.</h1>
-          <p className="mt-6 text-navy-deep/70 max-w-2xl text-lg">
-            Engage with digital rights topics, write your perspective, and get recognised — sometimes with cash prizes attached.
-          </p>
+        <Section className="relative py-24">
+          <Eyebrow><Sparkles className="h-3.5 w-3.5" /> Our flagship programme</Eyebrow>
+          <h1 className="mt-4 max-w-4xl text-5xl font-bold text-navy-deep sm:text-6xl">The BraverTogether Digital Rights Essay Competition.</h1>
+          <p className="mt-6 max-w-2xl text-lg text-navy-deep/70">Research an issue shaping young people online, build a clear argument and contribute your own perspective to the digital-rights conversation.</p>
         </Section>
       </div>
 
-      <Section>
-        <div className="grid lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 rounded-3xl border border-border bg-card p-8 shadow-card relative overflow-hidden">
-            <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-teal/20 blur-3xl" />
+      <Section className="py-12">
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <article className="relative overflow-hidden rounded-3xl border border-border bg-card p-8 shadow-card sm:p-10">
+            <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal/20 blur-3xl" />
             <div className="relative">
-              <div className="inline-flex items-center gap-2 rounded-full bg-teal/15 text-teal px-3 py-1 text-xs font-semibold uppercase tracking-widest mb-4">
-                <Sparkles className="h-3 w-3" /> Featured
-              </div>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3">Inaugural Digital Rights Essay Competition</h2>
-              <p className="text-muted-foreground mb-6 max-w-xl">
-                Write a teen-perspective essay on a digital rights topic of your choice. Winners receive a cash prize and have their work published on the platform.
-              </p>
-              <div className="grid sm:grid-cols-3 gap-3 mb-8">
-                {[
-                  { icon: Trophy, l: "Cash Prize", v: "TBD" },
-                  { icon: Calendar, l: "Dates", v: "TBD" },
-                  { icon: Users, l: "Open to", v: "Ages 12–18" },
-                ].map((s) => (
-                  <div key={s.l} className="rounded-xl border border-border p-3 flex items-center gap-3">
-                    <s.icon className="h-4 w-4 text-teal" />
-                    <div>
-                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.l}</div>
-                      <div className="text-sm font-semibold">{s.v}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button className="inline-flex items-center gap-2 rounded-full bg-navy text-white px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition">
-                Notify me when applications open
-              </button>
-            </div>
-          </div>
+              <div className={cn("inline-flex rounded-full px-4 py-2 text-xs font-bold uppercase tracking-widest", competition.acceptingSubmissions ? "bg-teal/10 text-teal" : "bg-secondary text-muted-foreground")}>{statusLabel}</div>
+              <h2 className="mt-5 font-display text-3xl font-bold sm:text-4xl">{competition.title}</h2>
+              <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">{competition.summary}</p>
 
-          <div className="rounded-3xl border border-dashed border-border bg-secondary/40 p-8 flex flex-col items-start">
-            <Calendar className="h-6 w-6 text-teal mb-3" />
-            <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Community Events</div>
-            <h3 className="font-display text-2xl font-bold mb-2">Coming up soon…</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Workshops, Q&As with advisors, and community discussions are in the works. Check back as we announce new events.
-            </p>
-            <div className="text-xs text-muted-foreground italic">No live events scheduled yet.</div>
-          </div>
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Detail icon={Users} label="Eligibility" value={`Ages ${competition.minimum_age}–${competition.maximum_age}`} />
+                <Detail icon={FileText} label="Word count" value={wordRange(competition.minimum_words, competition.maximum_words)} />
+                <Detail icon={Calendar} label="Deadline" value={competition.closes_at ? new Date(competition.closes_at).toLocaleString() : "To be announced"} />
+                <Detail icon={Trophy} label="Prize" value={competition.prize_text || "To be announced"} />
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link to="/essay-submission" className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
+                  <FileText className="h-4 w-4" /> {competition.acceptingSubmissions ? "Submit your essay" : "Open submission portal"}
+                </Link>
+                {competition.rules_url && <a href={competition.rules_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full border border-border px-6 py-3 font-semibold">Read competition rules</a>}
+              </div>
+            </div>
+          </article>
+
+          <aside className="rounded-3xl border border-border bg-secondary/40 p-7">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal/10 text-teal"><FileText className="h-6 w-6" /></div>
+            <h2 className="mt-5 font-display text-2xl font-bold">What the portal provides</h2>
+            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <li>A private PDF or DOCX upload for signed-in student accounts.</li>
+              <li>File-type, size, header and integrity verification.</li>
+              <li>A permanent submission reference and revision number.</li>
+              <li>The ability to replace or withdraw an entry before the deadline.</li>
+            </ul>
+          </aside>
         </div>
       </Section>
 
-      <div className="bg-secondary/40 border-y border-border">
+      <div className="border-y border-border bg-secondary/40">
         <Section>
           <div className="max-w-3xl">
-            <Eyebrow>Past competitions</Eyebrow>
-            <h2 className="mt-4 text-3xl font-bold">Nothing yet — you could be in the first cohort.</h2>
-            <p className="mt-4 text-muted-foreground">
-              The essay competition is our inaugural event. Winning entries will be archived here for future participants to read.
-            </p>
+            <Eyebrow>Winning work</Eyebrow>
+            <h2 className="mt-4 text-3xl font-bold">The first collection will be published after judging.</h2>
+            <p className="mt-4 text-muted-foreground">Selected entries will be presented here so future participants can learn from strong research, clear reasoning and distinctive student perspectives.</p>
           </div>
         </Section>
       </div>
     </SiteLayout>
   );
+}
+
+function Detail({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return <div className="rounded-xl border border-border bg-background/70 p-4"><Icon className="h-4 w-4 text-teal" /><div className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</div><div className="mt-1 text-sm font-semibold">{value}</div></div>;
+}
+
+function wordRange(minimum: number | null, maximum: number | null) {
+  if (minimum && maximum) return `${minimum.toLocaleString()}–${maximum.toLocaleString()} words`;
+  if (minimum) return `At least ${minimum.toLocaleString()} words`;
+  if (maximum) return `Up to ${maximum.toLocaleString()} words`;
+  return "To be announced";
 }
