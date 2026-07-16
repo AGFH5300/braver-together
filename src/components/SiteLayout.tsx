@@ -38,7 +38,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex items-center gap-1">
-      <Link to="/messages" onClick={onNavigate} title="Messages" aria-label="Messages" className="rounded-md p-2 hover:bg-secondary"><MessageCircle className="h-4 w-4" /></Link>
+      <Link to="/messages" search={{ c: undefined }} onClick={onNavigate} title="Messages" aria-label="Messages" className="rounded-md p-2 hover:bg-secondary"><MessageCircle className="h-4 w-4" /></Link>
       <Link to="/meetings" onClick={onNavigate} title="Meetings" aria-label="Meetings" className="rounded-md p-2 hover:bg-secondary"><CalendarDays className="h-4 w-4" /></Link>
       <Link to="/profile" onClick={onNavigate} title="Profile" aria-label="Profile" className="rounded-md p-2 hover:bg-secondary"><UserIcon className="h-4 w-4" /></Link>
       <button
