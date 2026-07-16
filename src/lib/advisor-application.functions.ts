@@ -106,7 +106,7 @@ export const submitAdvisorApplication = createServerFn({ method: "POST" })
     const { data: application, error } = await supabaseAdmin
       .from("advisor_applications")
       .upsert(payload, { onConflict: "user_id" })
-      .select("id, status, submitted_at")
+      .select("id, submitted_at")
       .single();
     if (error) throw new Error(error.message);
 
@@ -117,7 +117,11 @@ export const submitAdvisorApplication = createServerFn({ method: "POST" })
       note: null,
     });
 
-    return application;
+    return {
+      id: application.id,
+      status: "pending" as const,
+      submitted_at: application.submitted_at,
+    };
   });
 
 export const listAdvisorApplications = createServerFn({ method: "GET" })
