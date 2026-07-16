@@ -11,6 +11,73 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "14.5" };
   public: {
     Tables: {
+      advisor_application_events: Table<
+        { action: string; actor_id: string | null; application_id: string; created_at: string; id: string; note: string | null },
+        { action: string; actor_id?: string | null; application_id: string; created_at?: string; id?: string; note?: string | null },
+        { action?: string; actor_id?: string | null; application_id?: string; created_at?: string; id?: string; note?: string | null }
+      >;
+      advisor_applications: Table<
+        {
+          admin_note: string | null;
+          availability_note: string | null;
+          email: string;
+          experience: string;
+          focus_areas: string[];
+          full_name: string;
+          id: string;
+          location: string | null;
+          motivation: string;
+          organization: string | null;
+          profile_url: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          role_title: string | null;
+          status: string;
+          submitted_at: string;
+          updated_at: string;
+          user_id: string;
+        },
+        {
+          admin_note?: string | null;
+          availability_note?: string | null;
+          email: string;
+          experience: string;
+          focus_areas?: string[];
+          full_name: string;
+          id?: string;
+          location?: string | null;
+          motivation: string;
+          organization?: string | null;
+          profile_url?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          role_title?: string | null;
+          status?: string;
+          submitted_at?: string;
+          updated_at?: string;
+          user_id: string;
+        },
+        {
+          admin_note?: string | null;
+          availability_note?: string | null;
+          email?: string;
+          experience?: string;
+          focus_areas?: string[];
+          full_name?: string;
+          id?: string;
+          location?: string | null;
+          motivation?: string;
+          organization?: string | null;
+          profile_url?: string | null;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          role_title?: string | null;
+          status?: string;
+          submitted_at?: string;
+          updated_at?: string;
+          user_id?: string;
+        }
+      >;
       ai_usage_daily: Table<
         { actor_key: string; feature: string; request_count: number; updated_at: string; usage_date: string },
         { actor_key: string; feature: string; request_count?: number; updated_at?: string; usage_date?: string },
@@ -65,6 +132,56 @@ export type Database = {
           subject?: string;
           teen_id?: string;
           topic?: string;
+          updated_at?: string;
+        }
+      >;
+      meeting_proposals: Table<
+        {
+          conversation_id: string;
+          created_at: string;
+          duration_minutes: number;
+          id: string;
+          meeting_url: string;
+          note: string | null;
+          proposed_start: string;
+          proposer_id: string;
+          responded_at: string | null;
+          responded_by: string | null;
+          status: string;
+          timezone: string;
+          title: string;
+          updated_at: string;
+        },
+        {
+          conversation_id: string;
+          created_at?: string;
+          duration_minutes?: number;
+          id?: string;
+          meeting_url: string;
+          note?: string | null;
+          proposed_start: string;
+          proposer_id: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: string;
+          timezone: string;
+          title?: string;
+          updated_at?: string;
+        },
+        {
+          conversation_id?: string;
+          created_at?: string;
+          duration_minutes?: number;
+          id?: string;
+          meeting_url?: string;
+          note?: string | null;
+          proposed_start?: string;
+          proposer_id?: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: string;
+          timezone?: string;
+          title?: string;
           updated_at?: string;
         }
       >;

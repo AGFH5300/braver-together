@@ -49,7 +49,7 @@ function Resources() {
         <Section className="py-24 relative">
           <Eyebrow><Video className="h-3.5 w-3.5" /> Video Resource Library</Eyebrow>
           <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">Digital law explained through videos you can actually follow.</h1>
-          <p className="mt-6 text-navy-deep/70 max-w-2xl text-lg">Short, practical lessons on privacy, contracts, online safety, AI and your rights. Videos will appear here as the BraverTogether series is published.</p>
+          <p className="mt-6 text-navy-deep/70 max-w-2xl text-lg">Short, practical lessons on privacy, contracts, online safety, AI and your rights. New videos will be added as they are published.</p>
         </Section>
       </div>
 
@@ -58,7 +58,7 @@ function Resources() {
           {[
             ["Watch at your pace", "Pause, replay and revisit any topic whenever you need it."],
             ["Built for teens", "Clear explanations without assuming prior legal knowledge."],
-            ["Optional YouTube discussion", "Public video comments can appear here once the YouTube API is connected."],
+            ["Continue the conversation", "Explore public discussion and further reading alongside each lesson."],
           ].map(([title, description]) => (
             <div key={title} className="rounded-2xl border border-border bg-card p-5"><div className="font-semibold mb-1">{title}</div><p className="text-sm text-muted-foreground">{description}</p></div>
           ))}
@@ -105,9 +105,9 @@ function ComingSoon() {
       <div className="absolute inset-0 dot-pattern opacity-25" />
       <div className="relative mx-auto max-w-2xl">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-mesh text-white shadow-glow"><Play className="h-7 w-7 fill-current" /></div>
-        <h2 className="mt-6 text-3xl sm:text-4xl font-bold">The first video lessons are being produced.</h2>
-        <p className="mt-4 text-muted-foreground leading-relaxed">The library and database are ready. Once a YouTube video is added and marked as published, it will automatically appear here with an embedded privacy-enhanced player.</p>
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-teal/10 px-4 py-2 text-sm font-semibold text-teal"><Sparkles className="h-4 w-4" /> No placeholder PDFs or broken download buttons</div>
+        <h2 className="mt-6 text-3xl sm:text-4xl font-bold">New video lessons are on the way.</h2>
+        <p className="mt-4 text-muted-foreground leading-relaxed">We’re producing short lessons that make privacy, online safety, digital contracts and technology law easier to understand. Check back soon for the first release.</p>
+        <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-teal/10 px-4 py-2 text-sm font-semibold text-teal"><Sparkles className="h-4 w-4" /> Free to watch · Made for teens</div>
       </div>
     </div>
   );
@@ -155,9 +155,9 @@ function VideoViewer({ video, commentsConfigured, onClose }: { video: ResourceVi
           <div><p className="leading-relaxed text-muted-foreground">{video.description}</p><a href={`https://www.youtube.com/watch?v=${video.youtube_video_id}`} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:border-teal/50">Open on YouTube <ExternalLink className="h-4 w-4" /></a></div>
           <aside className="rounded-2xl border border-border bg-secondary/30 p-4">
             <div className="flex items-center gap-2 font-semibold"><MessageCircle className="h-4 w-4 text-teal" /> YouTube discussion</div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Public comments are shown from YouTube and remain subject to YouTube moderation.</p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Comments shown here are public posts from YouTube and remain subject to YouTube moderation.</p>
             {comments === null ? (
-              <button onClick={showComments} disabled={loadingComments || !video.comments_enabled} className="mt-4 w-full rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{loadingComments ? "Loading…" : commentsConfigured ? "Show top comments" : "Comments not connected yet"}</button>
+              <button onClick={showComments} disabled={loadingComments || !video.comments_enabled || !commentsConfigured} className="mt-4 w-full rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{loadingComments ? "Loading…" : commentsConfigured ? "Show top comments" : "Comments unavailable"}</button>
             ) : comments.length === 0 ? (
               <p className="mt-4 rounded-xl bg-card p-3 text-xs text-muted-foreground">{commentMessage || "No public comments are available."}</p>
             ) : (

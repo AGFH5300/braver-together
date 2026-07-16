@@ -18,7 +18,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run lint && npm run build"
+    "check": "npm run build && npm run typecheck && npm run lint"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",

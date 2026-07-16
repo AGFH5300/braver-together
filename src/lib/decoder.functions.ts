@@ -26,12 +26,12 @@ export type ContractAnalysis = z.infer<typeof GeneratedAnalysisSchema> & {
 const Input = z.object({ text: z.string().trim().min(20).max(MAX_CONTRACT_CHARACTERS) });
 
 export const analyzeContract = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => Input.parse(data))
+  .validator((data: unknown) => Input.parse(data))
   .handler(async ({ data }): Promise<ContractAnalysis> => {
     const apiKey = process.env.DECODER_AI_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     const modelName = process.env.DECODER_AI_MODEL || process.env.AI_MODEL;
     if (!apiKey || !modelName) {
-      throw new Error("The Contract Decoder code is ready, but a free AI API key and model have not been configured yet.");
+      throw new Error("The Contract Decoder is temporarily unavailable. Please try again later.");
     }
 
     const allowance = await consumeAiAllowance({ feature: "decoder", dailyLimit: 10 });
