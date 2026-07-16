@@ -25,6 +25,15 @@ function validateMeetingUrl(value: string): string {
   return url.toString();
 }
 
+function validateTimezone(value: string): string {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format();
+    return value;
+  } catch {
+    throw new Error("Choose a valid time zone.");
+  }
+}
+
 async function getConversationForParticipant(conversationId: string, userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
@@ -63,9 +72,11 @@ export const createMeetingProposal = createServerFn({ method: "POST" })
     const start = new Date(data.proposedStart);
     const minimum = Date.now() + 5 * 60_000;
     const maximum = Date.now() + 180 * 24 * 60 * 60_000;
+    if (!Number.isFinite(start.getTime())) throw new Error("Choose a valid date and time.");
     if (start.getTime() < minimum) throw new Error("Choose a time at least five minutes from now.");
     if (start.getTime() > maximum) throw new Error("Meetings can be proposed up to six months ahead.");
 
+    const timezone = validateTimezone(data.timezone);
     const meetingUrl = validateMeetingUrl(data.meetingUrl);
     const { data: proposal, error } = await supabaseAdmin
       .from("meeting_proposals")
@@ -74,7 +85,7 @@ export const createMeetingProposal = createServerFn({ method: "POST" })
         proposer_id: context.userId,
         proposed_start: start.toISOString(),
         duration_minutes: data.durationMinutes,
-        timezone: data.timezone,
+        timezone,
         title: data.title,
         note: data.note || null,
         meeting_url: meetingUrl,
@@ -88,7 +99,7 @@ export const createMeetingProposal = createServerFn({ method: "POST" })
       conversation_id: conversation.id,
       sender_id: null,
       sender_kind: "system",
-      body: `A meeting was proposed for ${start.toLocaleString("en", { dateStyle: "medium", timeStyle: "short", timeZone: data.timezone })}. Open Meetings to review it.`,
+      body: `A meeting was proposed for ${start.toLocaleString("en", { dateStyle: "medium", timeStyle: "short", timeZone: timezone })}. Open Meetings to review it.`,
       metadata: { meeting_proposal_id: proposal.id },
     });
 
@@ -102,7 +113,7 @@ export const respondMeetingProposal = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: proposal } = await supabaseAdmin
       .from("meeting_proposals")
-      .select("id, conversation_id, proposer_id, status, proposed_start")
+      .select("id, conversation_id, proposer_id, status")
       .eq("id", data.proposalId)
       .maybeSingle();
     if (!proposal) throw new Error("Meeting proposal not found.");
@@ -117,16 +128,15 @@ export const respondMeetingProposal = createServerFn({ method: "POST" })
     }
 
     const now = new Date().toISOString();
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from("meeting_proposals")
-      .update({
-        status: data.action,
-        responded_by: context.userId,
-        responded_at: now,
-      })
+      .update({ status: data.action, responded_by: context.userId, responded_at: now })
       .eq("id", proposal.id)
-      .eq("status", "pending");
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    if (!updated) throw new Error("This meeting proposal has already been answered.");
 
     const verb = data.action === "accepted" ? "accepted" : data.action === "declined" ? "declined" : "cancelled";
     await supabaseAdmin.from("messages").insert({
