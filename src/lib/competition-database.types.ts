@@ -4,7 +4,7 @@ type Table<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
   Update: Update;
-  Relationships: unknown[];
+  Relationships: [];
 };
 
 type CompetitionRow = {
@@ -87,8 +87,13 @@ type CompetitionTables = {
   >;
 };
 
-export type CompetitionDatabase = Omit<Database, "public"> & {
-  public: Omit<Database["public"], "Tables"> & {
+export type CompetitionDatabase = {
+  __InternalSupabase: Database["__InternalSupabase"];
+  public: {
     Tables: Database["public"]["Tables"] & CompetitionTables;
+    Views: Database["public"]["Views"];
+    Functions: Database["public"]["Functions"];
+    Enums: Database["public"]["Enums"];
+    CompositeTypes: Database["public"]["CompositeTypes"];
   };
 };
