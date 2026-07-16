@@ -11,10 +11,7 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — BraverTogether" },
-      {
-        name: "description",
-        content: "Sign in or create an account to message advisors and manage meetings.",
-      },
+      { name: "description", content: "Sign in or create an account to message advisors and manage meetings." },
     ],
   }),
   component: AuthPage,
@@ -35,7 +32,7 @@ function AuthPage() {
   useEffect(() => {
     let cancelled = false;
     void supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled && data.user) void navigate({ to: "/messages" });
+      if (!cancelled && data.user) void navigate({ to: "/messages", search: { c: undefined } });
     });
 
     const resetTransientState = () => setGoogleLoading(false);
@@ -115,7 +112,7 @@ function AuthPage() {
         toast.success("Signed in");
       }
 
-      await navigate({ to: "/messages" });
+      await navigate({ to: "/messages", search: { c: undefined } });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
       setInlineMessage(message);
@@ -134,115 +131,37 @@ function AuthPage() {
         <Section className="relative py-20">
           <div className="mx-auto max-w-md">
             <Eyebrow>{mode === "signup" ? "Create your account" : "Welcome back"}</Eyebrow>
-            <h1 className="mt-4 text-4xl font-bold text-navy-deep">
-              {mode === "signup" ? "Join BraverTogether." : "Sign in to continue."}
-            </h1>
-            <p className="mt-3 text-navy-deep/70">
-              {mode === "signup"
-                ? "Ask advisors, follow conversations and manage meeting proposals in one account."
-                : "Access your messages, profile and meetings."}
-            </p>
+            <h1 className="mt-4 text-4xl font-bold text-navy-deep">{mode === "signup" ? "Join BraverTogether." : "Sign in to continue."}</h1>
+            <p className="mt-3 text-navy-deep/70">{mode === "signup" ? "Ask advisors, follow conversations and manage meeting proposals in one account." : "Access your messages, profile and meetings."}</p>
 
             <div className="mt-8 rounded-2xl border border-border bg-card/95 p-6 shadow-card backdrop-blur">
               <div className="grid grid-cols-2 rounded-xl bg-secondary p-1" aria-label="Account action">
-                <button
-                  type="button"
-                  onClick={() => changeMode("signup")}
-                  className={cn(
-                    "rounded-lg px-4 py-2.5 text-sm font-semibold transition",
-                    mode === "signup" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Create account
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeMode("signin")}
-                  className={cn(
-                    "rounded-lg px-4 py-2.5 text-sm font-semibold transition",
-                    mode === "signin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Sign in
-                </button>
+                <button type="button" onClick={() => changeMode("signup")} className={cn("rounded-lg px-4 py-2.5 text-sm font-semibold transition", mode === "signup" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Create account</button>
+                <button type="button" onClick={() => changeMode("signin")} className={cn("rounded-lg px-4 py-2.5 text-sm font-semibold transition", mode === "signin" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Sign in</button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleGoogle}
-                disabled={busy || !googleEnabled}
-                className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-navy/15 bg-white px-4 py-3 text-sm font-semibold text-navy-deep transition hover:border-teal/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-55"
-              >
-                {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
-                {googleEnabled ? "Continue with Google" : "Google sign-in coming soon"}
+              <button type="button" onClick={handleGoogle} disabled={busy || !googleEnabled} className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-navy/15 bg-white px-4 py-3 text-sm font-semibold text-navy-deep transition hover:border-teal/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-55">
+                {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}{googleEnabled ? "Continue with Google" : "Google sign-in coming soon"}
               </button>
 
-              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="h-px flex-1 bg-border" /> or use email <div className="h-px flex-1 bg-border" />
-              </div>
+              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground"><div className="h-px flex-1 bg-border" /> or use email <div className="h-px flex-1 bg-border" /></div>
 
-              {inlineMessage && (
-                <div className="mb-4 rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm text-foreground" role="status" aria-live="polite">
-                  {inlineMessage}
-                </div>
-              )}
+              {inlineMessage && <div className="mb-4 rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm text-foreground" role="status" aria-live="polite">{inlineMessage}</div>}
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                {mode === "signup" && (
-                  <Field
-                    icon={UserIcon}
-                    autoComplete="name"
-                    placeholder="Display name"
-                    value={displayName}
-                    onChange={setDisplayName}
-                    required
-                  />
-                )}
-                <Field
-                  icon={Mail}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={setEmail}
-                  required
-                />
-                <Field
-                  icon={Lock}
-                  type="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  placeholder="Password — at least 8 characters"
-                  value={password}
-                  onChange={setPassword}
-                  required
-                  minLength={8}
-                />
+                {mode === "signup" && <Field icon={UserIcon} autoComplete="name" placeholder="Display name" value={displayName} onChange={setDisplayName} required />}
+                <Field icon={Mail} type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={setEmail} required />
+                <Field icon={Lock} type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="Password — at least 8 characters" value={password} onChange={setPassword} required minLength={8} />
 
                 {mode === "signup" && (
                   <label className="flex items-start gap-2 pt-1 text-xs text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={agreed}
-                      onChange={(event) => setAgreed(event.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      I agree to the{" "}
-                      <Link to="/advisors" className="font-semibold text-teal underline underline-offset-2">
-                        community rules
-                      </Link>{" "}
-                      and understand that the service provides educational information, not legal advice.
-                    </span>
+                    <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5" />
+                    <span>I agree to the <Link to="/advisors" className="font-semibold text-teal underline underline-offset-2">community rules</Link> and understand that the service provides educational information, not legal advice.</span>
                   </label>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50"
-                >
-                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                  {mode === "signup" ? "Create account" : "Sign in securely"}
+                <button type="submit" disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50">
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : "Sign in securely"}
                 </button>
               </form>
             </div>
@@ -253,40 +172,8 @@ function AuthPage() {
   );
 }
 
-function Field({
-  icon: Icon,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  required,
-  minLength,
-  autoComplete,
-}: {
-  icon: React.ElementType;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-  required?: boolean;
-  minLength?: number;
-  autoComplete?: string;
-}) {
-  return (
-    <div className="relative">
-      <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        required={required}
-        minLength={minLength}
-        autoComplete={autoComplete}
-        className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-teal/40"
-      />
-    </div>
-  );
+function Field({ icon: Icon, value, onChange, type = "text", placeholder, required, minLength, autoComplete }: { icon: React.ElementType; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; required?: boolean; minLength?: number; autoComplete?: string }) {
+  return <div className="relative"><Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} minLength={minLength} autoComplete={autoComplete} className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-teal/40" /></div>;
 }
 
 function GoogleIcon() {
