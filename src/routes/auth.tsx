@@ -1,13 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
+const AuthSearch = z.object({
+  intent: z.enum(["advisor"]).optional(),
+});
+
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search) => AuthSearch.parse(search),
   head: () => ({
     meta: [
       { title: "Sign in — BraverTogether" },
@@ -19,7 +25,9 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const { intent } = Route.useSearch();
+  const advisorIntent = intent === "advisor";
+  const [mode, setMode] = useState<"signin" | "signup">(advisorIntent ? "signin" : "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -29,10 +37,18 @@ function AuthPage() {
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
   const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
+  async function continueAfterAuth() {
+    if (advisorIntent) {
+      await navigate({ to: "/advisor-application", replace: true });
+      return;
+    }
+    await navigate({ to: "/messages", search: { c: undefined }, replace: true });
+  }
+
   useEffect(() => {
     let cancelled = false;
     void supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled && data.user) void navigate({ to: "/messages", search: { c: undefined } });
+      if (!cancelled && data.user) void continueAfterAuth();
     });
 
     const resetTransientState = () => setGoogleLoading(false);
@@ -43,7 +59,7 @@ function AuthPage() {
       window.removeEventListener("pageshow", resetTransientState);
       document.removeEventListener("visibilitychange", resetTransientState);
     };
-  }, [navigate]);
+  }, [advisorIntent, navigate]);
 
   function changeMode(nextMode: "signin" | "signup") {
     setMode(nextMode);
@@ -60,10 +76,11 @@ function AuthPage() {
     setGoogleLoading(true);
     setInlineMessage(null);
     try {
+      const redirectPath = advisorIntent ? "/auth?intent=advisor" : "/auth";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${window.location.origin}${redirectPath}`,
           skipBrowserRedirect: true,
         },
       });
@@ -89,18 +106,26 @@ function AuthPage() {
     setFormLoading(true);
     try {
       if (mode === "signup") {
+        const redirectPath = advisorIntent ? "/auth?intent=advisor" : "/auth";
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth`,
-            data: { display_name: displayName.trim() || email.split("@")[0] },
+            emailRedirectTo: `${window.location.origin}${redirectPath}`,
+            data: {
+              display_name: displayName.trim() || email.split("@")[0],
+              ...(advisorIntent ? { onboarding_intent: "advisor" } : {}),
+            },
           },
         });
         if (error) throw error;
 
         if (!data.session) {
-          setInlineMessage("Account created. Check your email to confirm your address, then sign in.");
+          setInlineMessage(
+            advisorIntent
+              ? "Account created. Confirm your email, then sign in to continue to the advisor application."
+              : "Account created. Check your email to confirm your address, then sign in.",
+          );
           setMode("signin");
           setPassword("");
           return;
@@ -112,7 +137,7 @@ function AuthPage() {
         toast.success("Signed in");
       }
 
-      await navigate({ to: "/messages", search: { c: undefined } });
+      await continueAfterAuth();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
       setInlineMessage(message);
@@ -130,9 +155,30 @@ function AuthPage() {
         <div className="absolute inset-0 dot-pattern opacity-50" />
         <Section className="relative py-20">
           <div className="mx-auto max-w-md">
-            <Eyebrow>{mode === "signup" ? "Create your account" : "Welcome back"}</Eyebrow>
-            <h1 className="mt-4 text-4xl font-bold text-navy-deep">{mode === "signup" ? "Join BraverTogether." : "Sign in to continue."}</h1>
-            <p className="mt-3 text-navy-deep/70">{mode === "signup" ? "Ask advisors, follow conversations and manage meeting proposals in one account." : "Access your messages, profile and meetings."}</p>
+            <Eyebrow>
+              {advisorIntent ? <UserRoundPlus className="h-3.5 w-3.5" /> : null}
+              {advisorIntent ? "Advisor applicant access" : mode === "signup" ? "Create your account" : "Welcome back"}
+            </Eyebrow>
+            <h1 className="mt-4 text-4xl font-bold text-navy-deep">
+              {advisorIntent
+                ? "Sign in to continue your advisor application."
+                : mode === "signup"
+                  ? "Join BraverTogether."
+                  : "Sign in to continue."}
+            </h1>
+            <p className="mt-3 text-navy-deep/70">
+              {advisorIntent
+                ? "Use the account you created through the advisor signup page. After signing in, you will go directly to the application portal."
+                : mode === "signup"
+                  ? "Ask advisors, follow conversations and manage meeting proposals in one account."
+                  : "Access your messages, profile and meetings."}
+            </p>
+
+            {advisorIntent && (
+              <div className="mt-5 rounded-2xl border border-teal/25 bg-teal/5 p-4 text-sm leading-relaxed text-navy-deep/70">
+                Signing in does not automatically make an account an advisor. Advisor access is granted only after the BraverTogether team approves the application.
+              </div>
+            )}
 
             <div className="mt-8 rounded-2xl border border-border bg-card/95 p-6 shadow-card backdrop-blur">
               <div className="grid grid-cols-2 rounded-xl bg-secondary p-1" aria-label="Account action">
@@ -161,9 +207,23 @@ function AuthPage() {
                 )}
 
                 <button type="submit" disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50">
-                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : "Sign in securely"}
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : advisorIntent ? "Sign in and continue application" : "Sign in securely"}
                 </button>
               </form>
+
+              <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
+                {advisorIntent ? (
+                  <>
+                    Need an advisor applicant account?{" "}
+                    <Link to="/advisor-signup" className="font-semibold text-teal underline underline-offset-4">Start advisor signup</Link>
+                  </>
+                ) : (
+                  <>
+                    Want to volunteer as an advisor?{" "}
+                    <Link to="/advisor-signup" className="font-semibold text-teal underline underline-offset-4">Use advisor signup</Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </Section>
