@@ -122,6 +122,9 @@ function Advisors() {
             <button onClick={() => navigate({ to: "/messages", search: { c: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
               <MessageCircle className="h-4 w-4" /> Open my inbox
             </button>
+            <Link to="/advisor-signup" className="inline-flex items-center gap-2 rounded-full border border-teal/35 bg-teal/10 px-6 py-3 font-semibold text-teal transition hover:bg-teal/15">
+              <UserRoundCheck className="h-4 w-4" /> Become an Advisor
+            </Link>
           </div>
         </Section>
       </div>
@@ -187,8 +190,8 @@ function Advisors() {
               <BriefcaseBusiness className="h-7 w-7 text-teal" />
               <h2 className="mt-3 font-display text-xl font-bold">Volunteer as an advisor</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Law students, researchers, academics and qualified professionals can apply. Every application is reviewed before advisor access is granted.</p>
-              <Link to="/advisor-application" className="mt-5 inline-flex w-full items-center justify-center rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal">
-                Apply to join the advisor team
+              <Link to="/advisor-signup" className="mt-5 inline-flex w-full items-center justify-center rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal">
+                Create an advisor applicant account
               </Link>
             </aside>
           </div>
