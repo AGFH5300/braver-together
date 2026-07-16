@@ -119,7 +119,7 @@ function Advisors() {
             <button onClick={() => openRequest(null)} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
               <Send className="h-4 w-4" /> Ask the advisor team
             </button>
-            <button onClick={() => navigate({ to: "/messages" })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
+            <button onClick={() => navigate({ to: "/messages", search: { c: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
               <MessageCircle className="h-4 w-4" /> Open my inbox
             </button>
           </div>
