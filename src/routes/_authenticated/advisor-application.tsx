@@ -330,7 +330,7 @@ function AdvisorApplicationPage() {
               <Field label="Organisation or institution" value={form.organization} onChange={(value) => setForm((current) => ({ ...current, organization: value }))} maxLength={160} />
               <Field label="Current role or course" value={form.roleTitle} onChange={(value) => setForm((current) => ({ ...current, roleTitle: value }))} maxLength={120} />
               <Field label="Location and time zone" value={form.location} onChange={(value) => setForm((current) => ({ ...current, location: value }))} maxLength={120} />
-              <Field label="Professional or university profile" type="url" placeholder="https://…" value={form.profileUrl} onChange={(value) => setForm((current) => ({ ...current, profileUrl: value }))} maxLength={500} />
+              <Field label="Professional or university profile" placeholder="example.com or https://example.com" value={form.profileUrl} onChange={(value) => setForm((current) => ({ ...current, profileUrl: value }))} maxLength={500} />
               <div className="sm:col-span-2"><Field label="Focus areas (comma-separated)" value={form.focusAreas} onChange={(value) => setForm((current) => ({ ...current, focusAreas: value }))} placeholder="Privacy, online safety, copyright" required maxLength={600} /></div>
               <div className="sm:col-span-2"><Field label="Relevant education and experience" textarea value={form.experience} onChange={(value) => setForm((current) => ({ ...current, experience: value }))} placeholder="Describe the experience that would help you answer educational questions responsibly." required minLength={40} maxLength={3000} minHeight="min-h-40" /></div>
               <div className="sm:col-span-2"><Field label="Why would you like to volunteer?" textarea value={form.motivation} onChange={(value) => setForm((current) => ({ ...current, motivation: value }))} required minLength={40} maxLength={3000} minHeight="min-h-40" /></div>
@@ -340,8 +340,8 @@ function AdvisorApplicationPage() {
             <div>
               <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <div className="text-sm font-semibold">CV or résumé</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Required · PDF or DOCX · maximum 5 MB</div>
+                  <div className="text-sm font-semibold">CV or résumé <span className="text-danger" aria-hidden="true">*</span><span className="sr-only"> required</span></div>
+                  <div className="mt-1 text-xs text-muted-foreground">PDF or DOCX · maximum 5 MB</div>
                 </div>
                 {application?.cv_original_filename && (
                   <button type="button" onClick={downloadCv} disabled={downloading} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold disabled:opacity-50">
@@ -383,7 +383,7 @@ function AdvisorApplicationPage() {
                     <>
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal/10 text-teal"><FileCheck2 className="h-7 w-7" /></div>
                       <div className="mt-4 max-w-full truncate font-semibold">{file.name}</div>
-                      <div className="mt-1 text-sm text-muted-foreground">{formatBytes(file.size)} · Ready for secure verification</div>
+                      <div className="mt-1 text-sm text-muted-foreground">{formatBytes(file.size)} · Ready to upload</div>
                       <div className="mt-5 flex flex-wrap justify-center gap-2">
                         <label htmlFor="advisor-cv-file" className="cursor-pointer rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold hover:border-teal/50">Choose a different file</label>
                         <button type="button" onClick={removeFile} className="inline-flex items-center gap-1.5 rounded-full border border-danger/30 px-4 py-2 text-sm font-semibold text-danger"><Trash2 className="h-3.5 w-3.5" /> Remove</button>
@@ -419,17 +419,17 @@ function AdvisorApplicationPage() {
 }
 
 function stageLabel(stage: UploadStage, existing: boolean): string {
-  if (stage === "hashing") return "Checking CV integrity…";
-  if (stage === "preparing") return "Creating secure upload…";
+  if (stage === "hashing") return "Preparing file…";
+  if (stage === "preparing") return "Starting upload…";
   if (stage === "uploading") return "Uploading CV…";
-  if (stage === "verifying") return "Verifying CV…";
+  if (stage === "verifying") return "Checking file…";
   if (stage === "submitting") return "Submitting application…";
   return existing ? "Resubmit application" : "Submit application";
 }
 
 function StatusPanel({ status, note, compact = false }: { status: Exclude<ApplicationStatus, "draft">; note?: string | null; compact?: boolean }) {
   const details = {
-    pending: { icon: Clock3, title: "Application under review", description: "Your application and verified CV have been received. You can continue using BraverTogether while the team reviews them.", className: "border-warn/30 bg-warn/5 text-warn" },
+    pending: { icon: Clock3, title: "Application under review", description: "Your application and CV have been received. We will update this page after the review.", className: "border-warn/30 bg-warn/5 text-warn" },
     more_info: { icon: AlertCircle, title: "More information requested", description: "Please review the note below, update your application and resubmit it.", className: "border-warn/30 bg-warn/5 text-warn" },
     approved: { icon: CheckCircle2, title: "Advisor account approved", description: "Your advisor access is active. Complete your profile, choose your availability and publish it when you are ready.", className: "border-teal/30 bg-teal/5 text-teal" },
     denied: { icon: AlertCircle, title: "Application not approved", description: "The current application was not approved. You may update it and resubmit when appropriate.", className: "border-danger/30 bg-danger/5 text-danger" },
@@ -455,5 +455,12 @@ function Field({ label, value, onChange, type = "text", placeholder, required, t
   minHeight?: string;
 }) {
   const className = "mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-normal outline-none focus:ring-2 focus:ring-teal/35";
-  return <label className="block text-sm font-semibold">{label}{textarea ? <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} className={cn(className, minHeight, "resize-y leading-relaxed")} /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} className={className} />}</label>;
+  return (
+    <label className="block text-sm font-semibold">
+      <span>{label}{required && <><span className="ml-1 text-danger" aria-hidden="true">*</span><span className="sr-only"> required</span></>}</span>
+      {textarea
+        ? <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} className={cn(className, minHeight, "resize-y leading-relaxed")} />
+        : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} minLength={minLength} maxLength={maxLength} autoCapitalize="none" spellCheck={false} className={className} />}
+    </label>
+  );
 }

@@ -84,6 +84,18 @@ Create and label these accounts:
 
 Use email addresses controlled by the team and a password manager.
 
+Create the Administrator account as an ordinary account first. Then, in Supabase SQL Editor, replace the email below and run:
+
+```sql
+insert into public.user_roles (user_id, role)
+select id, 'admin'::public.app_role
+from auth.users
+where lower(email) = lower('admin@example.com')
+on conflict (user_id, role) do nothing;
+```
+
+Sign out and back in after assigning the role. Keep the administrator account separate from student and advisor-applicant accounts.
+
 ## 4. Public navigation and layout
 
 Desktop widths: 1280, 1440, 1920 and 2048 pixels.
@@ -223,6 +235,9 @@ Valid uploads:
 - submit the complete application
 - observe hashing, secure-slot creation, upload and server verification stages
 - confirm pending status after success
+- confirm account controls show `Application under review` and sign out only
+- manually open `/messages`, `/meetings`, `/profile`, `/essay-submission`, `/admin-advisors` and `/admin-competitions`
+- confirm every protected route redirects back to `/advisor-application` until approval
 - download the current CV and compare it with the original
 
 Repeat with a genuine DOCX.
@@ -567,7 +582,7 @@ Do not deploy to Render until all are true:
 - `npm run check` passes on the final branch
 - all required environment variables work in Replit
 - regular signup/sign-in works
-- advisor applicant forced-onboarding works
+- advisor applicants remain gated through draft, pending, more-information and denied states until approval
 - valid PDF and DOCX CV uploads work
 - invalid CV files fail safely
 - admin can download and review CVs

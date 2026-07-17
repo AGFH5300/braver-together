@@ -47,9 +47,19 @@ const ReviewInput = z.object({
 });
 
 function normalizeHttpsUrl(value: string): string | null {
-  if (!value) return null;
-  const url = new URL(value);
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error("Enter a valid website address.");
+  }
+
   if (url.protocol !== "https:") throw new Error("Profile links must use HTTPS.");
+  if (!url.hostname || !url.hostname.includes(".")) throw new Error("Enter a valid website address.");
   return url.toString();
 }
 
@@ -99,7 +109,7 @@ async function ensureAdvisorIntent(userId: string) {
     supabaseAdmin.from("advisor_applications").select("status").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("profiles").select("is_advisor").eq("id", userId).maybeSingle(),
   ]);
-  const completed = Boolean(profile?.is_advisor || (application && application.status !== "draft"));
+  const completed = Boolean(profile?.is_advisor || application?.status === "approved");
   const payload = {
     user_id: userId,
     completed_at: completed ? new Date().toISOString() : null,
@@ -122,7 +132,7 @@ export const getAdvisorOnboardingGate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: intent }, { data: application }, { data: profile }] = await Promise.all([
+    const [{ data: intent }, { data: application }, { data: profile }, { data: adminRole }] = await Promise.all([
       supabaseAdmin
         .from("advisor_onboarding_intents")
         .select("completed_at")
@@ -134,13 +144,20 @@ export const getAdvisorOnboardingGate = createServerFn({ method: "GET" })
         .eq("user_id", context.userId)
         .maybeSingle(),
       supabaseAdmin.from("profiles").select("is_advisor").eq("id", context.userId).maybeSingle(),
+      supabaseAdmin
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("role", "admin")
+        .maybeSingle(),
     ]);
 
+    const isApplicant = Boolean(intent || application);
     const required = Boolean(
-      intent
-      && !intent.completed_at
+      isApplicant
       && !profile?.is_advisor
-      && (!application || application.status === "draft"),
+      && !adminRole
+      && application?.status !== "approved",
     );
     return { required, applicationStatus: application?.status ?? null };
   });
@@ -168,7 +185,7 @@ export const getAdvisorPortalState = createServerFn({ method: "GET" })
       application,
       isAdmin: Boolean(adminRole),
       isAdvisor: Boolean(profile?.is_advisor),
-      applicationRequired: !profile?.is_advisor && !adminRole && (!application || application.status === "draft"),
+      applicationRequired: !profile?.is_advisor && !adminRole && application?.status !== "approved",
     };
   });
 
@@ -226,7 +243,7 @@ export const submitAdvisorApplication = createServerFn({ method: "POST" })
       }),
       supabaseAdmin
         .from("advisor_onboarding_intents")
-        .upsert({ user_id: context.userId, completed_at: now }, { onConflict: "user_id" }),
+        .upsert({ user_id: context.userId, completed_at: null }, { onConflict: "user_id" }),
     ]);
 
     return { id: application.id, status: "pending" as const, submitted_at: application.submitted_at };
@@ -301,7 +318,7 @@ export const prepareAdvisorCvUpload = createServerFn({ method: "POST" })
           pending_previous_status: null,
         })
         .eq("id", applicationId);
-      throw new Error(signedError?.message || "A secure CV upload slot could not be created.");
+      throw new Error(signedError?.message || "The CV upload could not be started.");
     }
 
     return { applicationId, filePath, uploadToken: signed.token };
@@ -321,7 +338,7 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
     if (readError) throw new Error(readError.message);
     if (!application) throw new Error("Advisor application not found.");
     if (!application.pending_cv_file_path || application.pending_cv_file_path !== data.filePath) {
-      throw new Error("This CV does not match the active secure upload slot.");
+      throw new Error("This upload is no longer active. Select the file again.");
     }
     if (!application.pending_cv_original_filename || !application.pending_cv_mime_type || !application.pending_cv_file_size || !application.pending_cv_file_sha256) {
       throw new Error("The pending CV metadata is incomplete.");
@@ -381,7 +398,7 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
         }),
         supabaseAdmin
           .from("advisor_onboarding_intents")
-          .upsert({ user_id: context.userId, completed_at: now }, { onConflict: "user_id" }),
+          .upsert({ user_id: context.userId, completed_at: null }, { onConflict: "user_id" }),
       ]);
 
       return {
@@ -501,6 +518,14 @@ export const reviewAdvisorApplication = createServerFn({ method: "POST" })
         .upsert({ user_id: application.user_id, role: "advisor" }, { onConflict: "user_id,role" });
       if (roleError) throw new Error(roleError.message);
     }
+
+    const { error: onboardingError } = await supabaseAdmin
+      .from("advisor_onboarding_intents")
+      .upsert({
+        user_id: application.user_id,
+        completed_at: data.decision === "approved" ? now : null,
+      }, { onConflict: "user_id" });
+    if (onboardingError) throw new Error(onboardingError.message);
 
     await supabaseAdmin.from("advisor_application_events").insert({
       application_id: application.id,
