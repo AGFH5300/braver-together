@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -23,27 +23,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Normalize onboarding upsert typing
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("src/lib/advisor-application.functions.ts")
-          content = path.read_text()
-          old = "  const payload = completed\n    ? { user_id: userId, completed_at: new Date().toISOString() }\n    : { user_id: userId };"
-          new = "  const payload = {\n    user_id: userId,\n    completed_at: completed ? new Date().toISOString() : null,\n  };"
-          if old not in content:
-              raise SystemExit("Expected onboarding payload block was not found")
-          path.write_text(content.replace(old, new, 1))
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/advisor-application.functions.ts
-          git commit -m "Normalize advisor onboarding upsert payload"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -69,19 +48,7 @@ jobs:
         run: npm run build
 
       - name: Type-check
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run typecheck 2>&1 | tee typecheck.log
-
-      - name: Upload typecheck diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: advisor-cv-typecheck
-          path: typecheck.log
-          if-no-files-found: error
-          retention-days: 1
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
