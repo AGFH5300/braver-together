@@ -100,9 +100,10 @@ async function ensureAdvisorIntent(userId: string) {
     supabaseAdmin.from("profiles").select("is_advisor").eq("id", userId).maybeSingle(),
   ]);
   const completed = Boolean(profile?.is_advisor || (application && application.status !== "draft"));
-  const payload = completed
-    ? { user_id: userId, completed_at: new Date().toISOString() }
-    : { user_id: userId };
+  const payload = {
+    user_id: userId,
+    completed_at: completed ? new Date().toISOString() : null,
+  };
   const { error } = await supabaseAdmin
     .from("advisor_onboarding_intents")
     .upsert(payload, { onConflict: "user_id" });
