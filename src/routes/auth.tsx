@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -6,6 +7,7 @@ import { z } from "zod";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { beginAdvisorOnboarding } from "@/lib/advisor-application.functions";
 import { cn } from "@/lib/utils";
 
 const AuthSearch = z.object({
@@ -25,6 +27,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const startAdvisorOnboarding = useServerFn(beginAdvisorOnboarding);
   const { intent } = Route.useSearch();
   const advisorIntent = intent === "advisor";
   const [mode, setMode] = useState<"signin" | "signup">(advisorIntent ? "signin" : "signup");
@@ -39,6 +42,8 @@ function AuthPage() {
 
   async function continueAfterAuth() {
     if (advisorIntent) {
+      await startAdvisorOnboarding();
+      window.dispatchEvent(new Event("advisor-onboarding-changed"));
       await navigate({ to: "/advisor-application", replace: true });
       return;
     }
