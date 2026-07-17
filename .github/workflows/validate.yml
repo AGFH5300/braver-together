@@ -28,6 +28,7 @@ jobs:
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
+          sed -i 's/re.subn(pattern, replacement, content/re.subn(pattern, lambda _match: replacement, content/' .github/scripts/apply_advisor_corrections.py
           set +e
           python .github/scripts/apply_advisor_corrections.py > advisor-correction.log 2>&1
           status=$?
