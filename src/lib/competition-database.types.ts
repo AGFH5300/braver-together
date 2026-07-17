@@ -68,7 +68,46 @@ type EssaySubmissionEventRow = {
   submission_id: string;
 };
 
-type CompetitionTables = {
+type AdvisorApplicationRow = {
+  admin_note: string | null;
+  availability_note: string | null;
+  cv_file_path: string | null;
+  cv_file_sha256: string | null;
+  cv_file_size: number | null;
+  cv_mime_type: string | null;
+  cv_original_filename: string | null;
+  email: string;
+  experience: string;
+  focus_areas: string[];
+  full_name: string;
+  id: string;
+  location: string | null;
+  motivation: string;
+  organization: string | null;
+  pending_cv_file_path: string | null;
+  pending_cv_file_sha256: string | null;
+  pending_cv_file_size: number | null;
+  pending_cv_mime_type: string | null;
+  pending_cv_original_filename: string | null;
+  pending_previous_status: string | null;
+  profile_url: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  role_title: string | null;
+  status: string;
+  submitted_at: string;
+  updated_at: string;
+  user_id: string;
+};
+
+type AdvisorOnboardingIntentRow = {
+  completed_at: string | null;
+  started_at: string;
+  updated_at: string;
+  user_id: string;
+};
+
+type AdditionalTables = {
   competitions: Table<
     CompetitionRow,
     Partial<Omit<CompetitionRow, "slug" | "title">> & Pick<CompetitionRow, "slug" | "title">,
@@ -85,12 +124,28 @@ type CompetitionTables = {
     Partial<Omit<EssaySubmissionEventRow, "action" | "submission_id">> & Pick<EssaySubmissionEventRow, "action" | "submission_id">,
     Partial<EssaySubmissionEventRow>
   >;
+  advisor_applications: Table<
+    AdvisorApplicationRow,
+    Partial<Omit<AdvisorApplicationRow, "email" | "experience" | "full_name" | "motivation" | "user_id">>
+      & Pick<AdvisorApplicationRow, "email" | "experience" | "full_name" | "motivation" | "user_id">,
+    Partial<AdvisorApplicationRow>
+  >;
+  advisor_onboarding_intents: Table<
+    AdvisorOnboardingIntentRow,
+    Partial<Omit<AdvisorOnboardingIntentRow, "user_id">> & Pick<AdvisorOnboardingIntentRow, "user_id">,
+    Partial<AdvisorOnboardingIntentRow>
+  >;
 };
+
+type BaseTables = Omit<
+  Database["public"]["Tables"],
+  "advisor_applications" | "competitions" | "essay_submissions" | "essay_submission_events"
+>;
 
 export type CompetitionDatabase = {
   __InternalSupabase: Database["__InternalSupabase"];
   public: {
-    Tables: Database["public"]["Tables"] & CompetitionTables;
+    Tables: BaseTables & AdditionalTables;
     Views: Database["public"]["Views"];
     Functions: Database["public"]["Functions"];
     Enums: Database["public"]["Enums"];
