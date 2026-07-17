@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -23,34 +23,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Apply requested advisor-flow corrections
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          sed -i 's/re.subn(pattern, replacement, content/re.subn(pattern, lambda _match: replacement, content/' .github/scripts/apply_advisor_corrections.py
-          set +e
-          python .github/scripts/apply_advisor_corrections.py > advisor-correction.log 2>&1
-          status=$?
-          set -e
-          cat advisor-correction.log
-          echo "exit_status=$status" >> advisor-correction.log
-          if [ "$status" -eq 0 ] && ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src docs
-            git commit -m "Keep advisor applicants gated until approval"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-          fi
-
-      - name: Upload advisor correction diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: advisor-correction-diagnostics
-          path: advisor-correction.log
-          if-no-files-found: error
-          retention-days: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
