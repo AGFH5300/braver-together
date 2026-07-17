@@ -107,6 +107,14 @@ type AdvisorOnboardingIntentRow = {
   user_id: string;
 };
 
+type AdvisorOnboardingIntentInsert = {
+  [key: string]: string | null | undefined;
+  completed_at?: string | null;
+  started_at?: string;
+  updated_at?: string;
+  user_id: string;
+};
+
 type AdditionalTables = {
   competitions: Table<
     CompetitionRow,
@@ -132,7 +140,7 @@ type AdditionalTables = {
   >;
   advisor_onboarding_intents: Table<
     AdvisorOnboardingIntentRow,
-    Partial<Omit<AdvisorOnboardingIntentRow, "user_id">> & Pick<AdvisorOnboardingIntentRow, "user_id">,
+    AdvisorOnboardingIntentInsert,
     Partial<AdvisorOnboardingIntentRow>
   >;
 };
