@@ -17,6 +17,13 @@ const nav = [
   { to: "/competitions", label: "Competitions" },
 ] as const;
 
+type OnboardingGateState = {
+  required: boolean;
+  applicationStatus: "draft" | "pending" | "more_info" | "approved" | "denied" | null;
+};
+
+const onboardingGateCache = new Map<string, OnboardingGateState>();
+
 function BrandMark({ className }: { className?: string }) {
   return (
     <div className={cn("relative flex h-9 w-9 items-center justify-center rounded-xl bg-mesh shadow-glow", className)}>
@@ -29,47 +36,69 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
   const { user, loading, signOut } = useAuth();
   const getOnboardingGate = useServerFn(getAdvisorOnboardingGate);
   const navigate = useNavigate();
-  const [gateLoading, setGateLoading] = useState(false);
-  const [applicationRequired, setApplicationRequired] = useState(false);
+  const [gate, setGate] = useState<OnboardingGateState | null>(() => user ? onboardingGateCache.get(user.id) ?? null : null);
+  const [gateLoading, setGateLoading] = useState(() => Boolean(user && !onboardingGateCache.has(user.id)));
 
   useEffect(() => {
     let active = true;
+    const userId = user?.id;
 
-    async function refreshGate() {
-      if (!user) {
+    async function refreshGate(showLoading: boolean) {
+      if (!userId) {
         if (active) {
-          setApplicationRequired(false);
+          setGate(null);
           setGateLoading(false);
         }
         return;
       }
-      setGateLoading(true);
+
+      if (showLoading) setGateLoading(true);
       try {
-        const gate = await getOnboardingGate();
-        if (active) setApplicationRequired(gate.required);
-      } catch {
-        if (active) setApplicationRequired(false);
+        const result = await getOnboardingGate();
+        const next: OnboardingGateState = {
+          required: result.required,
+          applicationStatus: result.applicationStatus as OnboardingGateState["applicationStatus"],
+        };
+        onboardingGateCache.set(userId, next);
+        if (active) setGate(next);
       } finally {
         if (active) setGateLoading(false);
       }
     }
 
-    void refreshGate();
-    const listener = () => void refreshGate();
+    if (!userId) {
+      setGate(null);
+      setGateLoading(false);
+    } else {
+      const cached = onboardingGateCache.get(userId);
+      if (cached) {
+        setGate(cached);
+        setGateLoading(false);
+      } else {
+        void refreshGate(true);
+      }
+    }
+
+    const listener = () => {
+      if (!userId) return;
+      onboardingGateCache.delete(userId);
+      void refreshGate(false);
+    };
     window.addEventListener("advisor-onboarding-changed", listener);
     return () => {
       active = false;
       window.removeEventListener("advisor-onboarding-changed", listener);
     };
-  }, [user]);
+  }, [user?.id]);
 
   async function handleSignOut() {
+    if (user) onboardingGateCache.delete(user.id);
     await signOut();
     onNavigate?.();
     await navigate({ to: "/" });
   }
 
-  if (loading || gateLoading) return <div className="h-8 w-20 animate-pulse rounded-full bg-secondary" aria-hidden="true" />;
+  if (loading || (user && gateLoading && !gate)) return <div className="h-8 w-20 animate-pulse rounded-full bg-secondary" aria-hidden="true" />;
 
   if (!user) {
     return (
@@ -84,11 +113,19 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
     );
   }
 
-  if (applicationRequired) {
+  if (gate?.required) {
+    const applicationLabel = gate.applicationStatus === "pending"
+      ? "Application under review"
+      : gate.applicationStatus === "more_info"
+        ? "Update application"
+        : gate.applicationStatus === "denied"
+          ? "Review application"
+          : "Complete application";
+
     return (
       <div className="flex shrink-0 items-center gap-1.5">
         <Link to="/advisor-application" onClick={onNavigate} className="inline-flex whitespace-nowrap items-center gap-1.5 rounded-full bg-teal px-4 py-2 text-xs font-semibold text-white shadow-sm">
-          <UserRoundPlus className="h-3.5 w-3.5" /> Complete application
+          <UserRoundPlus className="h-3.5 w-3.5" /> {applicationLabel}
         </Link>
         <button onClick={handleSignOut} title="Sign out" aria-label="Sign out" className="rounded-md p-2 hover:bg-secondary">
           <LogOut className="h-4 w-4" />

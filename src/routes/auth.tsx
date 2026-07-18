@@ -212,7 +212,7 @@ function AuthPage() {
                 )}
 
                 <button type="submit" disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50">
-                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : advisorIntent ? "Sign in and continue application" : "Sign in securely"}
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : advisorIntent ? "Sign in and continue application" : "Sign in"}
                 </button>
               </form>
 
