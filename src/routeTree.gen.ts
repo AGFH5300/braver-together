@@ -16,11 +16,17 @@ import { Route as DecoderRouteImport } from './routes/decoder'
 import { Route as CompetitionsRouteImport } from './routes/competitions'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdvisorsRouteImport } from './routes/advisors'
+import { Route as AdvisorSignupRouteImport } from './routes/advisor-signup'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
+import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
+import { Route as AuthenticatedEssaySubmissionRouteImport } from './routes/_authenticated/essay-submission'
+import { Route as AuthenticatedAdvisorApplicationRouteImport } from './routes/_authenticated/advisor-application'
+import { Route as AuthenticatedAdminCompetitionsRouteImport } from './routes/_authenticated/admin-competitions'
+import { Route as AuthenticatedAdminAdvisorsRouteImport } from './routes/_authenticated/admin-advisors'
 
 const TeamRoute = TeamRouteImport.update({
   id: '/team',
@@ -57,6 +63,11 @@ const AdvisorsRoute = AdvisorsRouteImport.update({
   path: '/advisors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdvisorSignupRoute = AdvisorSignupRouteImport.update({
+  id: '/advisor-signup',
+  path: '/advisor-signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -81,10 +92,40 @@ const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedEssaySubmissionRoute =
+  AuthenticatedEssaySubmissionRouteImport.update({
+    id: '/essay-submission',
+    path: '/essay-submission',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdvisorApplicationRoute =
+  AuthenticatedAdvisorApplicationRouteImport.update({
+    id: '/advisor-application',
+    path: '/advisor-application',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminCompetitionsRoute =
+  AuthenticatedAdminCompetitionsRouteImport.update({
+    id: '/admin-competitions',
+    path: '/admin-competitions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminAdvisorsRoute =
+  AuthenticatedAdminAdvisorsRouteImport.update({
+    id: '/admin-advisors',
+    path: '/admin-advisors',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/advisor-signup': typeof AdvisorSignupRoute
   '/advisors': typeof AdvisorsRoute
   '/auth': typeof AuthRoute
   '/competitions': typeof CompetitionsRoute
@@ -92,12 +133,18 @@ export interface FileRoutesByFullPath {
   '/news': typeof NewsRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/admin-advisors': typeof AuthenticatedAdminAdvisorsRoute
+  '/admin-competitions': typeof AuthenticatedAdminCompetitionsRoute
+  '/advisor-application': typeof AuthenticatedAdvisorApplicationRoute
+  '/essay-submission': typeof AuthenticatedEssaySubmissionRoute
+  '/meetings': typeof AuthenticatedMeetingsRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/advisor-signup': typeof AdvisorSignupRoute
   '/advisors': typeof AdvisorsRoute
   '/auth': typeof AuthRoute
   '/competitions': typeof CompetitionsRoute
@@ -105,6 +152,11 @@ export interface FileRoutesByTo {
   '/news': typeof NewsRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/admin-advisors': typeof AuthenticatedAdminAdvisorsRoute
+  '/admin-competitions': typeof AuthenticatedAdminCompetitionsRoute
+  '/advisor-application': typeof AuthenticatedAdvisorApplicationRoute
+  '/essay-submission': typeof AuthenticatedEssaySubmissionRoute
+  '/meetings': typeof AuthenticatedMeetingsRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/profile': typeof AuthenticatedProfileRoute
 }
@@ -113,6 +165,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about': typeof AboutRoute
+  '/advisor-signup': typeof AdvisorSignupRoute
   '/advisors': typeof AdvisorsRoute
   '/auth': typeof AuthRoute
   '/competitions': typeof CompetitionsRoute
@@ -120,6 +173,11 @@ export interface FileRoutesById {
   '/news': typeof NewsRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/_authenticated/admin-advisors': typeof AuthenticatedAdminAdvisorsRoute
+  '/_authenticated/admin-competitions': typeof AuthenticatedAdminCompetitionsRoute
+  '/_authenticated/advisor-application': typeof AuthenticatedAdvisorApplicationRoute
+  '/_authenticated/essay-submission': typeof AuthenticatedEssaySubmissionRoute
+  '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
 }
@@ -128,6 +186,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/advisor-signup'
     | '/advisors'
     | '/auth'
     | '/competitions'
@@ -135,12 +194,18 @@ export interface FileRouteTypes {
     | '/news'
     | '/resources'
     | '/team'
+    | '/admin-advisors'
+    | '/admin-competitions'
+    | '/advisor-application'
+    | '/essay-submission'
+    | '/meetings'
     | '/messages'
     | '/profile'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
+    | '/advisor-signup'
     | '/advisors'
     | '/auth'
     | '/competitions'
@@ -148,6 +213,11 @@ export interface FileRouteTypes {
     | '/news'
     | '/resources'
     | '/team'
+    | '/admin-advisors'
+    | '/admin-competitions'
+    | '/advisor-application'
+    | '/essay-submission'
+    | '/meetings'
     | '/messages'
     | '/profile'
   id:
@@ -155,6 +225,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/about'
+    | '/advisor-signup'
     | '/advisors'
     | '/auth'
     | '/competitions'
@@ -162,6 +233,11 @@ export interface FileRouteTypes {
     | '/news'
     | '/resources'
     | '/team'
+    | '/_authenticated/admin-advisors'
+    | '/_authenticated/admin-competitions'
+    | '/_authenticated/advisor-application'
+    | '/_authenticated/essay-submission'
+    | '/_authenticated/meetings'
     | '/_authenticated/messages'
     | '/_authenticated/profile'
   fileRoutesById: FileRoutesById
@@ -170,6 +246,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutRoute: typeof AboutRoute
+  AdvisorSignupRoute: typeof AdvisorSignupRoute
   AdvisorsRoute: typeof AdvisorsRoute
   AuthRoute: typeof AuthRoute
   CompetitionsRoute: typeof CompetitionsRoute
@@ -230,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdvisorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/advisor-signup': {
+      id: '/advisor-signup'
+      path: '/advisor-signup'
+      fullPath: '/advisor-signup'
+      preLoaderRoute: typeof AdvisorSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -265,15 +349,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMessagesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meetings': {
+      id: '/_authenticated/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/essay-submission': {
+      id: '/_authenticated/essay-submission'
+      path: '/essay-submission'
+      fullPath: '/essay-submission'
+      preLoaderRoute: typeof AuthenticatedEssaySubmissionRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/advisor-application': {
+      id: '/_authenticated/advisor-application'
+      path: '/advisor-application'
+      fullPath: '/advisor-application'
+      preLoaderRoute: typeof AuthenticatedAdvisorApplicationRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin-competitions': {
+      id: '/_authenticated/admin-competitions'
+      path: '/admin-competitions'
+      fullPath: '/admin-competitions'
+      preLoaderRoute: typeof AuthenticatedAdminCompetitionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin-advisors': {
+      id: '/_authenticated/admin-advisors'
+      path: '/admin-advisors'
+      fullPath: '/admin-advisors'
+      preLoaderRoute: typeof AuthenticatedAdminAdvisorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminAdvisorsRoute: typeof AuthenticatedAdminAdvisorsRoute
+  AuthenticatedAdminCompetitionsRoute: typeof AuthenticatedAdminCompetitionsRoute
+  AuthenticatedAdvisorApplicationRoute: typeof AuthenticatedAdvisorApplicationRoute
+  AuthenticatedEssaySubmissionRoute: typeof AuthenticatedEssaySubmissionRoute
+  AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminAdvisorsRoute: AuthenticatedAdminAdvisorsRoute,
+  AuthenticatedAdminCompetitionsRoute: AuthenticatedAdminCompetitionsRoute,
+  AuthenticatedAdvisorApplicationRoute: AuthenticatedAdvisorApplicationRoute,
+  AuthenticatedEssaySubmissionRoute: AuthenticatedEssaySubmissionRoute,
+  AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
 }
@@ -285,6 +414,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutRoute: AboutRoute,
+  AdvisorSignupRoute: AdvisorSignupRoute,
   AdvisorsRoute: AdvisorsRoute,
   AuthRoute: AuthRoute,
   CompetitionsRoute: CompetitionsRoute,
@@ -296,3 +426,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
