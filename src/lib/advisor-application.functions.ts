@@ -132,7 +132,7 @@ export const getAdvisorOnboardingGate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: intent }, { data: application }, { data: profile }, { data: adminRole }] = await Promise.all([
+    const [{ data: intent }, { data: application }, { data: profile }, { data: adminRole }, { data: advisorRole }] = await Promise.all([
       supabaseAdmin
         .from("advisor_onboarding_intents")
         .select("completed_at")
@@ -150,16 +150,30 @@ export const getAdvisorOnboardingGate = createServerFn({ method: "GET" })
         .eq("user_id", context.userId)
         .eq("role", "admin")
         .maybeSingle(),
+      supabaseAdmin
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", context.userId)
+        .eq("role", "advisor")
+        .maybeSingle(),
     ]);
 
     const isApplicant = Boolean(intent || application);
+    const isAdmin = Boolean(adminRole);
+    const isAdvisor = Boolean(profile?.is_advisor && advisorRole);
     const required = Boolean(
       isApplicant
-      && !profile?.is_advisor
-      && !adminRole
+      && !isAdvisor
+      && !isAdmin
       && application?.status !== "approved",
     );
-    return { required, applicationStatus: application?.status ?? null };
+    return {
+      required,
+      applicationStatus: application?.status ?? null,
+      isApplicant,
+      isAdvisor,
+      isAdmin,
+    };
   });
 
 export const getAdvisorPortalState = createServerFn({ method: "GET" })
