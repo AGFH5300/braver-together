@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/advisor-signup")({
   beforeLoad: () => {
-    throw redirect({ to: "/auth", search: { intent: "advisor" } });
+    throw redirect({ to: "/auth" });
   },
   head: () => ({
     meta: [
