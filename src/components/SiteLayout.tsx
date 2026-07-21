@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { getAdvisorOnboardingGate } from "@/lib/advisor-application.functions";
 import { cn } from "@/lib/utils";
+import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -266,7 +267,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           <div><div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div><p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p></div>
-          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><ul className="space-y-2 text-sm text-white/70">{nav.slice(1).map((item) => <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>)}<li><Link to="/auth" search={{ intent: "advisor" }} className="inline-flex items-center gap-1.5 font-semibold text-teal-soft hover:text-white"><UserRoundPlus className="h-3.5 w-3.5" /> Apply to be an Advisor</Link></li></ul></div>
+          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><ul className="space-y-2 text-sm text-white/70">{nav.slice(1).map((item) => <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>)}<li><AdvisorIntentTrigger className="inline-flex items-center gap-1.5 font-semibold text-teal-soft hover:text-white"><UserRoundPlus className="h-3.5 w-3.5" /> Apply to be an Advisor</AdvisorIntentTrigger></li></ul></div>
           <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4><p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p></div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-white/55">© {new Date().getFullYear()} BraverTogether · Digital Legal Literacy Initiative</div>
