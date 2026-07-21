@@ -39,7 +39,7 @@ export function AdvisorIntentTrigger({
     onNavigate?.();
     await navigate({
       to: "/auth",
-      search: { intent: "advisor", mode },
+      search: { mode },
     });
   }
 
