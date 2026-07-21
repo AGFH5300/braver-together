@@ -1,18 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon, UserRoundPlus } from "lucide-react";
+import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { beginAdvisorOnboarding } from "@/lib/advisor-application.functions";
 import { cn } from "@/lib/utils";
 
 const AuthSearch = z.object({
-  intent: z.enum(["advisor"]).optional(),
   mode: z.enum(["signup", "signin"]).optional(),
 });
 
@@ -29,9 +26,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const startAdvisorOnboarding = useServerFn(beginAdvisorOnboarding);
-  const { intent, mode: requestedMode } = Route.useSearch();
-  const advisorIntent = intent === "advisor";
+  const { mode: requestedMode } = Route.useSearch();
   const [mode, setMode] = useState<"signin" | "signup">(requestedMode ?? "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,14 +38,8 @@ function AuthPage() {
   const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
   const continueAfterAuth = useCallback(async () => {
-    if (advisorIntent) {
-      await startAdvisorOnboarding();
-      window.dispatchEvent(new Event("advisor-onboarding-changed"));
-      await navigate({ to: "/advisor-application", replace: true });
-      return;
-    }
     await navigate({ to: "/messages", search: { c: undefined }, replace: true });
-  }, [advisorIntent, navigate, startAdvisorOnboarding]);
+  }, [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,7 +72,7 @@ function AuthPage() {
     setGoogleLoading(true);
     setInlineMessage(null);
     try {
-      const redirectPath = advisorIntent ? `/auth?intent=advisor&mode=${mode}` : "/auth";
+      const redirectPath = "/auth";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -113,7 +102,7 @@ function AuthPage() {
     setFormLoading(true);
     try {
       if (mode === "signup") {
-        const redirectPath = advisorIntent ? "/auth?intent=advisor&mode=signin" : "/auth";
+        const redirectPath = "/auth";
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -128,9 +117,7 @@ function AuthPage() {
 
         if (!data.session) {
           setInlineMessage(
-            advisorIntent
-              ? "Member account created. Confirm your email, then sign in to start your advisor application."
-              : "Member account created. Check your email to confirm your address, then sign in.",
+            "Member account created. Check your email to confirm your address, then sign in.",
           );
           setMode("signin");
           setPassword("");
@@ -162,31 +149,16 @@ function AuthPage() {
         <Section className="relative py-20">
           <div className="mx-auto max-w-md">
             <Eyebrow>
-              {advisorIntent ? <UserRoundPlus className="h-3.5 w-3.5" /> : null}
-              {advisorIntent ? "Member account and advisor application" : mode === "signup" ? "Create your member account" : "Welcome back"}
+              {mode === "signup" ? "Create your member account" : "Welcome back"}
             </Eyebrow>
             <h1 className="mt-4 text-4xl font-bold text-navy-deep">
-              {advisorIntent
-                ? mode === "signup"
-                  ? "Join as a member, then apply to be an advisor."
-                  : "Sign in, then continue your advisor application."
-                : mode === "signup"
-                  ? "Join BraverTogether."
-                  : "Sign in to continue."}
+              {mode === "signup" ? "Join BraverTogether." : "Sign in to continue."}
             </h1>
             <p className="mt-3 text-navy-deep/70">
-              {advisorIntent
-                ? "There is one BraverTogether account for everyone. Create or sign in to your member account, then complete the separate advisor application."
-                : mode === "signup"
-                  ? "Join as a member to ask advisors, follow conversations and enter competitions."
-                  : "Access your messages, meetings and profile."}
+              {mode === "signup"
+                ? "Join as a member to ask advisors, follow conversations and enter competitions."
+                : "Access your messages, meetings and profile."}
             </p>
-
-            {advisorIntent && (
-              <div className="mt-5 rounded-2xl border border-teal/25 bg-teal/5 p-4 text-sm leading-relaxed text-navy-deep/70">
-                Applying does not change your member account while the application is reviewed. Advisor tools appear only after the BraverTogether team approves you.
-              </div>
-            )}
 
             <div className="mt-8 rounded-2xl border border-border bg-card/95 p-6 shadow-card backdrop-blur">
               <div className="grid grid-cols-2 rounded-xl bg-secondary p-1" aria-label="Account action">
@@ -215,19 +187,15 @@ function AuthPage() {
                 )}
 
                 <button type="submit" disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50">
-                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create member account" : advisorIntent ? "Sign in and continue application" : "Sign in"}
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create member account" : "Sign in"}
                 </button>
               </form>
 
               <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
-                {advisorIntent ? (
-                  <>Already have a member account? Choose <strong className="text-foreground">Sign in</strong> above and continue with the same account.</>
-                ) : (
-                  <>
-                    Interested in volunteering?{" "}
-                    <AdvisorIntentTrigger className="font-semibold text-teal underline underline-offset-4">Learn how advisor applications work</AdvisorIntentTrigger>
-                  </>
-                )}
+                <>
+                  Interested in volunteering?{" "}
+                  <AdvisorIntentTrigger className="font-semibold text-teal underline underline-offset-4">Learn how advisor applications work</AdvisorIntentTrigger>
+                </>
               </div>
             </div>
           </div>
