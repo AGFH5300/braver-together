@@ -6,12 +6,14 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
+import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { beginAdvisorOnboarding } from "@/lib/advisor-application.functions";
 import { cn } from "@/lib/utils";
 
 const AuthSearch = z.object({
   intent: z.enum(["advisor"]).optional(),
+  mode: z.enum(["signup", "signin"]).optional(),
 });
 
 export const Route = createFileRoute("/auth")({
@@ -28,9 +30,9 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const startAdvisorOnboarding = useServerFn(beginAdvisorOnboarding);
-  const { intent } = Route.useSearch();
+  const { intent, mode: requestedMode } = Route.useSearch();
   const advisorIntent = intent === "advisor";
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [mode, setMode] = useState<"signin" | "signup">(requestedMode ?? "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -81,7 +83,7 @@ function AuthPage() {
     setGoogleLoading(true);
     setInlineMessage(null);
     try {
-      const redirectPath = advisorIntent ? "/auth?intent=advisor" : "/auth";
+      const redirectPath = advisorIntent ? `/auth?intent=advisor&mode=${mode}` : "/auth";
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -111,7 +113,7 @@ function AuthPage() {
     setFormLoading(true);
     try {
       if (mode === "signup") {
-        const redirectPath = advisorIntent ? "/auth?intent=advisor" : "/auth";
+        const redirectPath = advisorIntent ? "/auth?intent=advisor&mode=signin" : "/auth";
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -223,7 +225,7 @@ function AuthPage() {
                 ) : (
                   <>
                     Interested in volunteering?{" "}
-                    <Link to="/auth" search={{ intent: "advisor" }} className="font-semibold text-teal underline underline-offset-4">Learn how advisor applications work</Link>
+                    <AdvisorIntentTrigger className="font-semibold text-teal underline underline-offset-4">Learn how advisor applications work</AdvisorIntentTrigger>
                   </>
                 )}
               </div>
