@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Lock, Mail, ShieldCheck, User as UserIcon, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — BraverTogether" },
-      { name: "description", content: "Sign in or create an account to message advisors and manage meetings." },
+      { name: "description", content: "Create or sign in to your BraverTogether member account." },
     ],
   }),
   component: AuthPage,
@@ -30,7 +30,7 @@ function AuthPage() {
   const startAdvisorOnboarding = useServerFn(beginAdvisorOnboarding);
   const { intent } = Route.useSearch();
   const advisorIntent = intent === "advisor";
-  const [mode, setMode] = useState<"signin" | "signup">(advisorIntent ? "signin" : "signup");
+  const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -40,7 +40,7 @@ function AuthPage() {
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
   const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
-  async function continueAfterAuth() {
+  const continueAfterAuth = useCallback(async () => {
     if (advisorIntent) {
       await startAdvisorOnboarding();
       window.dispatchEvent(new Event("advisor-onboarding-changed"));
@@ -48,7 +48,7 @@ function AuthPage() {
       return;
     }
     await navigate({ to: "/messages", search: { c: undefined }, replace: true });
-  }
+  }, [advisorIntent, navigate, startAdvisorOnboarding]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +64,7 @@ function AuthPage() {
       window.removeEventListener("pageshow", resetTransientState);
       document.removeEventListener("visibilitychange", resetTransientState);
     };
-  }, [advisorIntent, navigate]);
+  }, [continueAfterAuth]);
 
   function changeMode(nextMode: "signin" | "signup") {
     setMode(nextMode);
@@ -119,7 +119,6 @@ function AuthPage() {
             emailRedirectTo: `${window.location.origin}${redirectPath}`,
             data: {
               display_name: displayName.trim() || email.split("@")[0],
-              ...(advisorIntent ? { onboarding_intent: "advisor" } : {}),
             },
           },
         });
@@ -128,8 +127,8 @@ function AuthPage() {
         if (!data.session) {
           setInlineMessage(
             advisorIntent
-              ? "Account created. Confirm your email, then sign in to continue to the advisor application."
-              : "Account created. Check your email to confirm your address, then sign in.",
+              ? "Member account created. Confirm your email, then sign in to start your advisor application."
+              : "Member account created. Check your email to confirm your address, then sign in.",
           );
           setMode("signin");
           setPassword("");
@@ -162,26 +161,28 @@ function AuthPage() {
           <div className="mx-auto max-w-md">
             <Eyebrow>
               {advisorIntent ? <UserRoundPlus className="h-3.5 w-3.5" /> : null}
-              {advisorIntent ? "Advisor applicant access" : mode === "signup" ? "Create your account" : "Welcome back"}
+              {advisorIntent ? "Member account and advisor application" : mode === "signup" ? "Create your member account" : "Welcome back"}
             </Eyebrow>
             <h1 className="mt-4 text-4xl font-bold text-navy-deep">
               {advisorIntent
-                ? "Sign in to continue your advisor application."
+                ? mode === "signup"
+                  ? "Join as a member, then apply to be an advisor."
+                  : "Sign in, then continue your advisor application."
                 : mode === "signup"
                   ? "Join BraverTogether."
                   : "Sign in to continue."}
             </h1>
             <p className="mt-3 text-navy-deep/70">
               {advisorIntent
-                ? "Use the account you created through the advisor signup page. After signing in, you will go directly to the application portal."
+                ? "There is one BraverTogether account for everyone. Create or sign in to your member account, then complete the separate advisor application."
                 : mode === "signup"
-                  ? "Ask advisors, follow conversations and manage meeting proposals in one account."
-                  : "Access your messages, profile and meetings."}
+                  ? "Join as a member to ask advisors, follow conversations and enter competitions."
+                  : "Access your messages, meetings and profile."}
             </p>
 
             {advisorIntent && (
               <div className="mt-5 rounded-2xl border border-teal/25 bg-teal/5 p-4 text-sm leading-relaxed text-navy-deep/70">
-                Signing in does not automatically make an account an advisor. Advisor access is granted only after the BraverTogether team approves the application.
+                Applying does not change your member account while the application is reviewed. Advisor tools appear only after the BraverTogether team approves you.
               </div>
             )}
 
@@ -212,20 +213,17 @@ function AuthPage() {
                 )}
 
                 <button type="submit" disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-4 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:opacity-50">
-                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create account" : advisorIntent ? "Sign in and continue application" : "Sign in"}
+                  {formLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{mode === "signup" ? "Create member account" : advisorIntent ? "Sign in and continue application" : "Sign in"}
                 </button>
               </form>
 
               <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
                 {advisorIntent ? (
-                  <>
-                    Need an advisor applicant account?{" "}
-                    <Link to="/advisor-signup" className="font-semibold text-teal underline underline-offset-4">Start advisor signup</Link>
-                  </>
+                  <>Already have a member account? Choose <strong className="text-foreground">Sign in</strong> above and continue with the same account.</>
                 ) : (
                   <>
-                    Want to volunteer as an advisor?{" "}
-                    <Link to="/advisor-signup" className="font-semibold text-teal underline underline-offset-4">Use advisor signup</Link>
+                    Interested in volunteering?{" "}
+                    <Link to="/auth" search={{ intent: "advisor" }} className="font-semibold text-teal underline underline-offset-4">Learn how advisor applications work</Link>
                   </>
                 )}
               </div>

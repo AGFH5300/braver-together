@@ -14,9 +14,8 @@ Complete this checklist in Replit/local development before any Render deployment
 ## 1. Pull and validate the code
 
 ```bash
-git checkout feature/advisor-signup-flow
-git pull origin feature/advisor-signup-flow
-rm -rf node_modules
+git branch --show-current
+git rev-parse HEAD
 npm ci --include=dev
 npm run check
 npm run dev -- --host 0.0.0.0 --port 5000
@@ -101,7 +100,7 @@ Sign out and back in after assigning the role. Keep the administrator account se
 Desktop widths: 1280, 1440, 1920 and 2048 pixels.
 
 - every navigation label remains on one line
-- `Ask an Advisor`, `Contract Decoder`, `Become an Advisor` and `Sign in` do not wrap
+- `Ask an Advisor`, `Contract Decoder`, `Apply to be an Advisor` and `Join or sign in` do not wrap
 - no header control overlaps another
 - the desktop menu changes to the mobile menu at the intended breakpoint
 - mobile menu opens, closes and scrolls properly
@@ -122,8 +121,8 @@ Signed out, test:
 - `/advisors`
 - `/competitions`
 - `/decoder`
-- `/advisor-signup`
 - `/auth`
+- `/advisor-signup` redirects to the advisor-intent view of `/auth`
 
 Check:
 
@@ -159,42 +158,44 @@ Protected-route checks while signed out:
 - `/admin-advisors`
 - `/admin-competitions`
 
-## 7. Advisor applicant signup and forced onboarding
+## 7. Member-first advisor application
 
 Using Advisor Applicant A:
 
-- click `Become an Advisor` from the desktop header
+- create one ordinary member account through `/auth`
+- click `Apply to be an Advisor` from the authenticated desktop header
 - repeat from the mobile menu, `/advisors`, footer and regular auth page
-- confirm every link reaches `/advisor-signup`
-- confirm the page clearly states that advisor access is not granted at signup
-- create the applicant account
-- confirm email if required
-- confirm the account continues to `/advisor-application`
+- confirm every entry uses the same `/auth?intent=advisor` account flow
+- confirm `/advisor-signup` redirects into that same flow and never shows a second signup form
+- confirm the page says that everyone starts as a member
+- confirm advisor access is granted only after approval
+- sign in with the existing member account
+- confirm the same account reaches `/advisor-application`
 
-Before submitting the application, manually attempt to open:
+Before and after submitting the application, manually open:
 
 - `/messages`
 - `/meetings`
 - `/profile`
 - `/essay-submission`
-- `/admin-advisors`
-- `/admin-competitions`
 
 Expected result:
 
-- each protected page redirects to `/advisor-application`
-- account controls show `Complete application` and sign out only
-- message, meeting and profile shortcuts are hidden
-- refreshing a blocked URL still redirects
-- changing the URL manually does not bypass the gate
+- applicant accounts keep the normal member experience while draft, pending, more-information or denied
+- account controls show member messages, meetings and profile
+- the application control shows the correct application status
+- advisor-only queue, availability and public-profile controls remain hidden until approval
+- `/admin-advisors` and `/admin-competitions` remain unavailable
+- approval changes the account controls to the advisor navigation after the onboarding event or a fresh sign-in
 
-Existing-account path:
+Fresh-account advisor path:
 
-- use a fresh ordinary account
-- click `Sign in and apply`
-- confirm `/auth?intent=advisor` is shown
+- open `/auth?intent=advisor` while signed out
+- create a member account in the same form used by every other user
+- confirm email if required
 - sign in
-- confirm the same account is marked for advisor onboarding and reaches `/advisor-application`
+- confirm the member account continues to `/advisor-application`
+- confirm no separate advisor-applicant account is created
 
 ## 8. Advisor application fields
 
@@ -235,9 +236,9 @@ Valid uploads:
 - submit the complete application
 - observe hashing, secure-slot creation, upload and server verification stages
 - confirm pending status after success
-- confirm account controls show `Application under review` and sign out only
-- manually open `/messages`, `/meetings`, `/profile`, `/essay-submission`, `/admin-advisors` and `/admin-competitions`
-- confirm every protected route redirects back to `/advisor-application` until approval
+- confirm account controls show `Application under review` alongside normal member controls
+- confirm `/messages`, `/meetings`, `/profile` and `/essay-submission` remain available as member features
+- confirm advisor queue, advisor availability, public-advisor publishing and admin routes remain unavailable until approval
 - download the current CV and compare it with the original
 
 Repeat with a genuine DOCX.
@@ -582,7 +583,7 @@ Do not deploy to Render until all are true:
 - `npm run check` passes on the final branch
 - all required environment variables work in Replit
 - regular signup/sign-in works
-- advisor applicants remain gated through draft, pending, more-information and denied states until approval
+- advisor applicants remain normal members through draft, pending, more-information and denied states, with advisor-only tools unavailable until approval
 - valid PDF and DOCX CV uploads work
 - invalid CV files fail safely
 - admin can download and review CVs
