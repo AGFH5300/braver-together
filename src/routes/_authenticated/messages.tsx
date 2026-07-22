@@ -64,19 +64,26 @@ type MeProfile = {
 };
 
 export const Route = createFileRoute("/_authenticated/messages")({
-  validateSearch: (search: Record<string, unknown>) => ({ c: typeof search.c === "string" ? search.c : undefined }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    c: typeof search.c === "string" ? search.c : undefined,
+    view: search.view === "queue" ? ("queue" as const) : undefined,
+  }),
   component: MessagesPage,
 });
 
 function MessagesPage() {
-  const { c: activeId } = Route.useSearch();
+  const { c: activeId, view } = Route.useSearch();
   const navigate = useNavigate();
   const claim = useServerFn(claimConversation);
   const [me, setMe] = useState<MeProfile | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
-  const [tab, setTab] = useState<"mine" | "queue">("mine");
+  const [tab, setTab] = useState<"mine" | "queue">(view === "queue" ? "queue" : "mine");
+
+  useEffect(() => {
+    setTab(view === "queue" && me?.is_advisor ? "queue" : "mine");
+  }, [me?.is_advisor, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +155,7 @@ function MessagesPage() {
       await claim({ data: { conversationId: active.id } });
       toast.success("Request claimed");
       setTab("mine");
+      await navigate({ to: "/messages", search: { c: active.id, view: undefined } });
       await loadConversations();
     } catch (error) {
       toast.error((error as Error).message);
@@ -156,23 +164,67 @@ function MessagesPage() {
     }
   }
 
+  if (!me) {
+    return (
+      <SiteLayout>
+        <Section className="py-24 text-center">
+          <Loader2 className="mx-auto h-7 w-7 animate-spin text-teal" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading your workspace…</p>
+        </Section>
+      </SiteLayout>
+    );
+  }
+
   return (
     <SiteLayout>
       <Section className="py-8 sm:py-10">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-teal">Support inbox</div>
-            <h1 className="mt-1 font-display text-3xl font-bold">Messages</h1>
+        <div className="mb-5 rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-widest text-teal">
+                {me?.is_advisor ? "Advisor workspace" : "Member support"}
+              </div>
+              <h1 className="mt-1 font-display text-3xl font-bold">
+                {me?.is_advisor ? (tab === "queue" ? "Open Request Queue" : "Advisor Inbox") : "My Support Requests"}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                {me?.is_advisor
+                  ? tab === "queue"
+                    ? "These requests have not been assigned. Claim one to read the private question and reply as its advisor."
+                    : "These are the member conversations currently assigned to you as an approved advisor."
+                  : "These are the questions you have already sent. Open one to read replies and continue the conversation."}
+              </p>
+            </div>
+            {!me?.is_advisor && (
+              <button onClick={() => navigate({ to: "/advisors" })} className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                Ask a new question
+              </button>
+            )}
           </div>
-          <button onClick={() => navigate({ to: "/advisors" })} className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-secondary">New request</button>
         </div>
 
         <div className="grid min-h-[650px] gap-5 lg:h-[calc(100vh-11rem)] lg:grid-cols-[340px_1fr]">
           <aside className={cn("overflow-hidden rounded-2xl border border-border bg-card flex-col", activeId ? "hidden lg:flex" : "flex")}>
             {me?.is_advisor && (
               <div className="grid grid-cols-2 border-b border-border p-2">
-                <button onClick={() => setTab("mine")} className={cn("rounded-lg px-3 py-2 text-sm font-semibold", tab === "mine" ? "bg-navy text-white" : "text-muted-foreground hover:bg-secondary")}>My inbox</button>
-                <button onClick={() => setTab("queue")} className={cn("rounded-lg px-3 py-2 text-sm font-semibold", tab === "queue" ? "bg-navy text-white" : "text-muted-foreground hover:bg-secondary")}>Open queue</button>
+                <button
+                  onClick={() => {
+                    setTab("mine");
+                    void navigate({ to: "/messages", search: { c: undefined, view: undefined } });
+                  }}
+                  className={cn("rounded-lg px-3 py-2 text-sm font-semibold", tab === "mine" ? "bg-navy text-white" : "text-muted-foreground hover:bg-secondary")}
+                >
+                  Assigned to me
+                </button>
+                <button
+                  onClick={() => {
+                    setTab("queue");
+                    void navigate({ to: "/messages", search: { c: undefined, view: "queue" } });
+                  }}
+                  className={cn("rounded-lg px-3 py-2 text-sm font-semibold", tab === "queue" ? "bg-navy text-white" : "text-muted-foreground hover:bg-secondary")}
+                >
+                  Open request queue
+                </button>
               </div>
             )}
             <div className="flex-1 overflow-y-auto">
@@ -181,12 +233,16 @@ function MessagesPage() {
               ) : visible.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   <Inbox className="mx-auto mb-3 h-9 w-9 opacity-35" />
-                  {tab === "queue" ? "There are no unclaimed requests." : "No conversations yet."}
+                  {tab === "queue"
+                    ? "There are no unclaimed member requests."
+                    : me?.is_advisor
+                      ? "No conversations are assigned to you yet."
+                      : "You have not asked an advisor a question yet."}
                 </div>
               ) : visible.map((conversation) => (
                 <button
                   key={conversation.id}
-                  onClick={() => navigate({ to: "/messages", search: { c: conversation.id } })}
+                  onClick={() => navigate({ to: "/messages", search: { c: conversation.id, view: tab === "queue" ? "queue" : undefined } })}
                   className={cn("w-full border-b border-border px-4 py-4 text-left transition hover:bg-secondary/60", activeId === conversation.id && "bg-secondary")}
                 >
                   <div className="flex items-start gap-3">
@@ -217,9 +273,9 @@ function MessagesPage() {
 
           <main className={cn("overflow-hidden rounded-2xl border border-border bg-card flex-col", activeId ? "flex" : "hidden lg:flex")}>
             {!active || !me ? (
-              <EmptyThread />
+              <EmptyThread isAdvisor={me?.is_advisor ?? false} queue={tab === "queue"} />
             ) : activeIsQueueItem ? (
-              <QueuePreview conversation={active} claiming={claiming} onClaim={claimActive} onBack={() => navigate({ to: "/messages", search: { c: undefined } })} />
+              <QueuePreview conversation={active} claiming={claiming} onClaim={claimActive} onBack={() => navigate({ to: "/messages", search: { c: undefined, view: "queue" } })} />
             ) : (
               <Thread conversation={active} me={me} onChanged={loadConversations} />
             )}
@@ -257,12 +313,20 @@ function QueuePreview({ conversation, claiming, onClaim, onBack }: { conversatio
   );
 }
 
-function EmptyThread() {
+function EmptyThread({ isAdvisor, queue }: { isAdvisor: boolean; queue: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
       <MessageCircle className="mb-3 h-11 w-11 opacity-30" />
-      <div className="font-semibold text-foreground">Choose a conversation</div>
-      <div className="mt-1 max-w-sm text-xs">Messages, advisor handoffs and limited AI responses will appear here in one continuous thread.</div>
+      <div className="font-semibold text-foreground">
+        {queue ? "Choose an open request" : isAdvisor ? "Choose an assigned conversation" : "Choose one of your support requests"}
+      </div>
+      <div className="mt-1 max-w-sm text-xs">
+        {queue
+          ? "You can see the topic and submission time before claiming it. The private question becomes visible only after assignment."
+          : isAdvisor
+            ? "Open a conversation to read the member's messages and reply as their advisor."
+            : "Open a request to read advisor replies and continue your conversation."}
+      </div>
     </div>
   );
 }
@@ -351,7 +415,7 @@ function Thread({ conversation, me, onChanged }: { conversation: Conversation; m
   return (
     <>
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <button onClick={() => navigate({ to: "/messages", search: { c: undefined } })} className="rounded p-1 hover:bg-secondary lg:hidden"><ArrowLeft className="h-4 w-4" /></button>
+        <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: undefined } })} className="rounded p-1 hover:bg-secondary lg:hidden"><ArrowLeft className="h-4 w-4" /></button>
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mesh text-sm font-semibold text-white">{other?.display_name?.[0]?.toUpperCase() ?? (conversation.advisor_id ? "?" : "Q")}</div>
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold text-sm">{conversation.subject}</div>
