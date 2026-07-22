@@ -254,7 +254,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1800px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-[1800px] items-center justify-between gap-4 px-4 py-2 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-2.5">
             <BrandMark />
             <div className="flex flex-col leading-none">
@@ -262,7 +262,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Digital Legal Literacy</span>
             </div>
           </Link>
-          <nav className="hidden min-w-0 items-center gap-0.5 2xl:flex">
+          <nav className="hidden min-w-0 flex-1 flex-wrap items-center justify-end gap-0.5 2xl:flex">
             {nav.map((item) => (
               <Link key={item.to} to={item.to} className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground" activeProps={{ className: "text-foreground bg-secondary" }} activeOptions={{ exact: item.to === "/" }}>
                 {item.label}
