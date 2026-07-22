@@ -680,8 +680,6 @@ function OtpStep({
         </InputOTP>
       </div>
 
-      <InboxShortcuts />
-
       <div className="flex items-center justify-between gap-3 text-xs">
         <button
           type="button"
@@ -705,37 +703,6 @@ function OtpStep({
         Code sent to{" "}
         <span className="font-semibold text-foreground">{email}</span>
       </p>
-    </div>
-  );
-}
-
-function InboxShortcuts() {
-  const shortcuts = [
-    { href: "https://mail.google.com/mail/u/0/#inbox", label: "Open Gmail" },
-    { href: "https://outlook.live.com/mail/0/inbox", label: "Open Outlook" },
-    { href: "mailto:", label: "Open email app" },
-  ];
-  return (
-    <div className="rounded-xl border border-teal/20 bg-teal/5 p-3">
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Open your inbox below. If the code is missing, check spam or junk.
-      </p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {shortcuts.map((shortcut) => (
-          <a
-            key={shortcut.label}
-            href={shortcut.href}
-            target={shortcut.href === "mailto:" ? undefined : "_blank"}
-            rel={
-              shortcut.href === "mailto:" ? undefined : "noopener noreferrer"
-            }
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2 py-2 text-[11px] font-semibold text-navy-deep transition hover:border-teal/40 hover:bg-secondary"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            {shortcut.label}
-          </a>
-        ))}
-      </div>
     </div>
   );
 }
