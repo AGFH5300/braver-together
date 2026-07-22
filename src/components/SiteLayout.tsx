@@ -57,7 +57,7 @@ function AccountLink({
   to: "/messages" | "/meetings" | "/profile" | "/admin-advisors" | "/admin-competitions";
   label: string;
   icon: React.ElementType;
-  messageView?: "mine" | "queue";
+  messageView?: "queue";
   onNavigate?: () => void;
 }) {
   const className =
@@ -209,7 +209,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
         <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-teal/10 px-3 py-2 text-xs font-semibold text-teal">
           <ShieldCheck className="h-3.5 w-3.5" /> Signed in as Advisor
         </span>
-        <AccountLink to="/messages" label="Advisor Inbox" icon={MessageCircle} messageView="mine" onNavigate={onNavigate} />
+        <AccountLink to="/messages" label="Advisor Inbox" icon={MessageCircle} onNavigate={onNavigate} />
         <AccountLink to="/messages" label="Open Request Queue" icon={Inbox} messageView="queue" onNavigate={onNavigate} />
         <AccountLink to="/meetings" label="Advisor Meetings" icon={CalendarDays} onNavigate={onNavigate} />
         <AccountLink to="/profile" label="Advisor Profile" icon={UserIcon} onNavigate={onNavigate} />
@@ -232,7 +232,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
       >
         <MessageCircle className="h-3.5 w-3.5" /> Ask an Advisor
       </Link>
-      <AccountLink to="/messages" label="My Support Requests" icon={MessageCircle} messageView="mine" onNavigate={onNavigate} />
+      <AccountLink to="/messages" label="My Support Requests" icon={MessageCircle} onNavigate={onNavigate} />
       <AccountLink to="/meetings" label="My Meetings" icon={CalendarDays} onNavigate={onNavigate} />
       <Link
         to="/advisor-application"
