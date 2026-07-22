@@ -14,9 +14,9 @@ export const Route = createFileRoute("/advisors")({
   head: () => ({
     meta: [
       { title: "Ask an Advisor — BraverTogether" },
-      { name: "description", content: "Send a digital-law question to a volunteer advisor and follow the conversation in your private inbox." },
+      { name: "description", content: "Start a new digital-law support request, then follow replies in My Support Requests." },
       { property: "og:title", content: "Ask an Advisor — BraverTogether" },
-      { property: "og:description", content: "Human-first educational guidance about digital law and online rights." },
+      { property: "og:description", content: "Start a support request for educational guidance about digital law and online rights." },
     ],
   }),
   component: Advisors,
@@ -114,14 +114,14 @@ function Advisors() {
           <Eyebrow><MessageCircle className="h-3.5 w-3.5" /> Ask an Advisor</Eyebrow>
           <h1 className="mt-4 max-w-3xl text-5xl font-bold text-navy-deep sm:text-6xl">Get help understanding your digital rights.</h1>
           <p className="mt-6 max-w-2xl text-lg text-navy-deep/70">
-            Send a question to a volunteer advisor, receive replies in your private inbox and arrange a meeting when a conversation needs more time.
+            This page starts a new support request. After you send it, use My Support Requests to read replies and continue the conversation.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button onClick={() => openRequest(null)} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
-              <Send className="h-4 w-4" /> Ask the advisor team
+              <Send className="h-4 w-4" /> Start a new support request
             </button>
             <button onClick={() => navigate({ to: "/messages", search: { c: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
-              <MessageCircle className="h-4 w-4" /> Open my inbox
+              <MessageCircle className="h-4 w-4" /> View my support requests
             </button>
             <AdvisorIntentTrigger className="inline-flex items-center gap-2 rounded-full border border-teal/35 bg-teal/10 px-6 py-3 font-semibold text-teal transition hover:bg-teal/15">
               <UserRoundCheck className="h-4 w-4" /> Become an Advisor
@@ -135,7 +135,7 @@ function Advisors() {
           <div className="flex items-start gap-4">
             <AlertTriangle className="mt-1 h-6 w-6 shrink-0 text-warn" />
             <div>
-              <h2 className="font-display text-2xl font-bold">Educational support, not legal advice.</h2>
+              <h2 className="font-display text-2xl font-bold">Before you start a support request</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 Do not share passwords, financial details, addresses, school records, names of other minors or confidential documents. For emergencies, immediate danger or urgent legal deadlines, contact a trusted adult and an appropriate qualified professional.
               </p>
@@ -150,8 +150,8 @@ function Advisors() {
             <Eyebrow>Human advisors</Eyebrow>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <h2 className="text-3xl font-bold sm:text-4xl">Choose an advisor or send your question to the team.</h2>
-                <p className="mt-2 text-sm text-muted-foreground">Availability shows whether an advisor is currently able to take new conversations.</p>
+                <h2 className="text-3xl font-bold sm:text-4xl">Who should receive your new request?</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Choose a specific advisor, or send the request to the team queue. Replies will appear under My Support Requests.</p>
               </div>
               <div className={cn("rounded-full px-4 py-2 text-sm font-semibold", availableCount ? "bg-teal/10 text-teal" : "bg-secondary text-muted-foreground")}>
                 {availableCount ? `${availableCount} available now` : "The team will reply when available"}
@@ -166,7 +166,7 @@ function Advisors() {
                   <UserRoundCheck className="mx-auto h-9 w-9 text-muted-foreground/50" />
                   <h3 className="mt-4 text-xl font-bold">Questions are still welcome.</h3>
                   <p className="mt-2 text-sm text-muted-foreground">Send your question to the team and it will remain in the queue until an approved advisor responds.</p>
-                  <button onClick={() => openRequest(null)} className="mt-5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Submit a question</button>
+                  <button onClick={() => openRequest(null)} className="mt-5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Start a support request</button>
                 </div>
               ) : advisors.map((advisor) => (
                 <AdvisorCard key={advisor.id} advisor={advisor} onMessage={() => openRequest(advisor)} />
@@ -203,7 +203,7 @@ function Advisors() {
         <div className="fixed inset-0 z-[100] overflow-y-auto bg-navy-deep/70 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.currentTarget === event.target) setFormOpen(false); }}>
           <form onSubmit={submit} className="mx-auto my-8 max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl sm:p-8">
             <div className="flex items-start justify-between gap-4">
-              <div><div className="text-xs font-bold uppercase tracking-widest text-teal">New support request</div><h2 className="mt-2 text-2xl font-bold">{selectedAdvisor ? `Message ${selectedAdvisor.display_name}` : "Ask the advisor team"}</h2></div>
+              <div><div className="text-xs font-bold uppercase tracking-widest text-teal">Step 1 · Start a support request</div><h2 className="mt-2 text-2xl font-bold">{selectedAdvisor ? `Send to ${selectedAdvisor.display_name}` : "Send to the advisor team"}</h2></div>
               <button type="button" onClick={() => setFormOpen(false)} className="rounded-full border border-border px-3 py-1.5 text-sm">Close</button>
             </div>
 
@@ -229,7 +229,7 @@ function Advisors() {
 
             <button type="submit" disabled={submitting || subject.trim().length < 5 || message.trim().length < 10} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white disabled:opacity-50">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {submitting ? "Submitting…" : "Send question"}
+              {submitting ? "Submitting…" : "Create support request"}
             </button>
           </form>
         </div>
