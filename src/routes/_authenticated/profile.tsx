@@ -140,9 +140,15 @@ function ProfilePage() {
     <SiteLayout>
       <div className="bg-hero">
         <Section className="py-14">
-          <Eyebrow>Your profile</Eyebrow>
-          <h1 className="mt-3 text-4xl font-bold text-navy-deep">Profile settings</h1>
-          <p className="mt-2 max-w-xl text-navy-deep/70">Manage the information shown in your account and, for approved advisors, your public availability.</p>
+          <Eyebrow>{form.is_advisor ? "Advisor profile" : "Member profile"}</Eyebrow>
+          <h1 className="mt-3 text-4xl font-bold text-navy-deep">
+            {form.is_advisor ? "Advisor profile and availability" : "My member profile"}
+          </h1>
+          <p className="mt-2 max-w-xl text-navy-deep/70">
+            {form.is_advisor
+              ? "Manage the information members see and control whether you can receive new support requests."
+              : "Manage your member information. Advisor access is a separate application and approval process."}
+          </p>
         </Section>
       </div>
 
@@ -154,13 +160,13 @@ function ProfilePage() {
           <Field label="Focus areas (comma-separated)" value={form.focus_areas} onChange={(value) => setForm((current) => ({ ...current, focus_areas: value }))} placeholder="Data privacy, online safety, copyright" maxLength={600} />
 
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal" /><div className="font-display font-bold">Advisor access</div></div>
+            <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal" /><div className="font-display font-bold">{form.is_advisor ? "Advisor settings" : "Optional advisor application"}</div></div>
 
             {!form.is_advisor ? (
               <div className="rounded-xl border border-border bg-secondary/50 p-5">
                 <UserRoundCheck className="h-7 w-7 text-teal" />
                 <h2 className="mt-3 text-lg font-bold">Interested in becoming an advisor?</h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Submit an application with your background and areas of interest. An administrator will review it before advisor access is granted.</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">You are currently a member. You can apply with your background and areas of interest, but you remain a member unless an administrator approves the application.</p>
                 <Link to="/advisor-application" className="mt-4 inline-flex rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Open advisor application</Link>
               </div>
             ) : (
