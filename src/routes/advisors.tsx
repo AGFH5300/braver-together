@@ -98,7 +98,7 @@ function Advisors() {
         allowAiFallback: !selectedAdvisor && allowAi,
       } });
       toast.success(selectedAdvisor ? "Conversation started" : "Your question was sent to the advisor team");
-      await navigate({ to: "/messages", search: { c: result.id } });
+      await navigate({ to: "/messages", search: { c: result.id, view: undefined } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Your question could not be submitted.");
     } finally {
@@ -120,7 +120,7 @@ function Advisors() {
             <button onClick={() => openRequest(null)} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
               <Send className="h-4 w-4" /> Start a new support request
             </button>
-            <button onClick={() => navigate({ to: "/messages", search: { c: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
+            <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
               <MessageCircle className="h-4 w-4" /> View my support requests
             </button>
             <AdvisorIntentTrigger className="inline-flex items-center gap-2 rounded-full border border-teal/35 bg-teal/10 px-6 py-3 font-semibold text-teal transition hover:bg-teal/15">
