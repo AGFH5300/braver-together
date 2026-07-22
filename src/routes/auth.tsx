@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -24,6 +25,8 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { supabase } from "@/integrations/supabase/client";
+import { roleHome } from "@/lib/account-access";
+import { getAccountAccessState } from "@/lib/account-access.functions";
 import { cn } from "@/lib/utils";
 
 const AuthSearch = z.object({
@@ -84,6 +87,7 @@ function saveSignupDraft(draft: SignupDraft) {
 
 function AuthPage() {
   const navigate = useNavigate();
+  const getAccess = useServerFn(getAccountAccessState);
   const { mode: requestedMode } = Route.useSearch();
   const [mode, setMode] = useState<AuthMode>(requestedMode ?? "signup");
   const [signupStep, setSignupStep] = useState<SignupStep>("details");
@@ -103,12 +107,15 @@ function AuthPage() {
   const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
   const continueAfterAuth = useCallback(async () => {
+    const access = await getAccess();
     await navigate({
-      to: "/messages",
-      search: { c: undefined, view: undefined },
+      to: roleHome(access.role),
+      ...(access.role === "member" || access.role === "advisor"
+        ? { search: { c: undefined, view: undefined } }
+        : {}),
       replace: true,
     });
-  }, [navigate]);
+  }, [getAccess, navigate]);
 
   useEffect(() => {
     const nextMode = requestedMode ?? "signup";

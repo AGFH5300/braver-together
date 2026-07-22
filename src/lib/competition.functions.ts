@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { loadAccountAccessState } from "@/lib/account-access.functions";
 
 export const CURRENT_COMPETITION_SLUG = "inaugural-digital-rights-essay";
 export const ESSAY_BUCKET = "essay-submissions";
@@ -109,18 +110,13 @@ function competitionIsOpen(competition: { status: string; opens_at: string | nul
 }
 
 async function roleState(userId: string) {
+  const access = await loadAccountAccessState(userId);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const roles = new Set((data ?? []).map((row) => row.role));
   return {
     supabaseAdmin,
-    isAdmin: roles.has("admin"),
-    isAdvisor: roles.has("advisor"),
-    isStudent: !roles.has("admin") && !roles.has("advisor"),
+    isAdmin: access.role === "administrator",
+    isAdvisor: access.role === "advisor",
+    isStudent: access.role === "member",
   };
 }
 

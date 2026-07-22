@@ -1,5 +1,4 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import {
   CalendarDays,
   Heart,
@@ -14,10 +13,12 @@ import {
   UserRoundPlus,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
-import { useAuth } from "@/hooks/use-auth";
-import { getAdvisorOnboardingGate } from "@/lib/advisor-application.functions";
+import {
+  clearAccountAccessCache,
+  useAccountAccess,
+} from "@/hooks/use-account-access";
 import { cn } from "@/lib/utils";
 import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 
@@ -30,14 +31,7 @@ const nav = [
   { to: "/competitions", label: "Competitions" },
 ] as const;
 
-type AccountState = {
-  applicationStatus: "draft" | "pending" | "more_info" | "approved" | "denied" | null;
-  isApplicant: boolean;
-  isAdvisor: boolean;
-  isAdmin: boolean;
-};
-
-const accountStateCache = new Map<string, AccountState>();
+type AccountAccessHook = ReturnType<typeof useAccountAccess>;
 
 function BrandMark({ className }: { className?: string }) {
   return (
@@ -93,66 +87,24 @@ function AccountLink({
   );
 }
 
-function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
-  const { user, loading, signOut } = useAuth();
-  const getAccountState = useServerFn(getAdvisorOnboardingGate);
+function AuthControls({
+  access,
+  onNavigate,
+}: {
+  access: AccountAccessHook;
+  onNavigate?: () => void;
+}) {
+  const { user, loading, account, signOut } = access;
   const navigate = useNavigate();
-  const [account, setAccount] = useState<AccountState | null>(() =>
-    user ? accountStateCache.get(user.id) ?? null : null,
-  );
-  const [accountLoading, setAccountLoading] = useState(() =>
-    Boolean(user && !accountStateCache.has(user.id)),
-  );
-
-  const refreshAccount = useCallback(async (userId: string, showLoading: boolean) => {
-    if (showLoading) setAccountLoading(true);
-    try {
-      const result = await getAccountState();
-      const next: AccountState = {
-        applicationStatus: result.applicationStatus as AccountState["applicationStatus"],
-        isApplicant: result.isApplicant,
-        isAdvisor: result.isAdvisor,
-        isAdmin: result.isAdmin,
-      };
-      accountStateCache.set(userId, next);
-      setAccount(next);
-    } finally {
-      setAccountLoading(false);
-    }
-  }, [getAccountState]);
-
-  useEffect(() => {
-    const userId = user?.id;
-    if (!userId) {
-      setAccount(null);
-      setAccountLoading(false);
-      return;
-    }
-
-    const cached = accountStateCache.get(userId);
-    if (cached) {
-      setAccount(cached);
-      setAccountLoading(false);
-    } else {
-      void refreshAccount(userId, true);
-    }
-
-    const listener = () => {
-      accountStateCache.delete(userId);
-      void refreshAccount(userId, false);
-    };
-    window.addEventListener("advisor-onboarding-changed", listener);
-    return () => window.removeEventListener("advisor-onboarding-changed", listener);
-  }, [refreshAccount, user?.id]);
 
   async function handleSignOut() {
-    if (user) accountStateCache.delete(user.id);
+    if (user) clearAccountAccessCache(user.id);
     await signOut();
     onNavigate?.();
     await navigate({ to: "/" });
   }
 
-  if (loading || (user && accountLoading && !account)) {
+  if (loading) {
     return <div className="h-8 w-24 animate-pulse rounded-full bg-secondary" aria-hidden="true" />;
   }
 
@@ -187,7 +139,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
           ? "Continue advisor application"
           : "Apply as an Advisor";
 
-  if (account?.isAdmin) {
+  if (account?.role === "administrator") {
     return (
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-navy px-3 py-2 text-xs font-semibold text-white">
@@ -203,7 +155,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
     );
   }
 
-  if (account?.isAdvisor) {
+  if (account?.role === "advisor") {
     return (
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-teal/10 px-3 py-2 text-xs font-semibold text-teal">
@@ -213,6 +165,20 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
         <AccountLink to="/messages" label="Open Request Queue" icon={Inbox} messageView="queue" onNavigate={onNavigate} />
         <AccountLink to="/meetings" label="Advisor Meetings" icon={CalendarDays} onNavigate={onNavigate} />
         <AccountLink to="/profile" label="Advisor Profile" icon={UserIcon} onNavigate={onNavigate} />
+        <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <LogOut className="h-3.5 w-3.5" /> Sign out
+        </button>
+      </div>
+    );
+  }
+
+  if (account?.role === "restricted") {
+    return (
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warn/10 px-3 py-2 text-xs font-semibold text-warn">
+          <ShieldCheck className="h-3.5 w-3.5" /> Account access needs review
+        </span>
+        <AccountLink to="/profile" label="My Profile" icon={UserIcon} onNavigate={onNavigate} />
         <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
           <LogOut className="h-3.5 w-3.5" /> Sign out
         </button>
@@ -251,6 +217,7 @@ function AuthControls({ onNavigate }: { onNavigate?: () => void }) {
 
 export function SiteLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const access = useAccountAccess();
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
@@ -269,7 +236,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               </Link>
             ))}
             <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">Contract Decoder</Link>
-            <div className="ml-1 shrink-0 border-l border-border pl-2"><AuthControls /></div>
+            <div className="ml-1 shrink-0 border-l border-border pl-2"><AuthControls access={access} /></div>
           </nav>
           <button onClick={() => setOpen(!open)} className="rounded-md p-2 hover:bg-secondary 2xl:hidden" aria-label={open ? "Close menu" : "Open menu"}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -284,7 +251,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <Link to="/decoder" onClick={() => setOpen(false)} className="mt-2 inline-flex items-center justify-center rounded-full bg-mesh px-4 py-2.5 text-sm font-semibold text-white">Contract Decoder</Link>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                 <span className="text-xs text-muted-foreground">Account</span>
-                <AuthControls onNavigate={() => setOpen(false)} />
+                <AuthControls access={access} onNavigate={() => setOpen(false)} />
               </div>
             </div>
           </div>
@@ -294,12 +261,76 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           <div><div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div><p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p></div>
-          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><ul className="space-y-2 text-sm text-white/70">{nav.slice(1).map((item) => <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>)}<li><Link to="/advisors" className="hover:text-white">Ask an Advisor</Link></li><li><AdvisorIntentTrigger className="inline-flex items-center gap-1.5 font-semibold text-teal-soft hover:text-white"><UserRoundPlus className="h-3.5 w-3.5" /> Apply to be an Advisor</AdvisorIntentTrigger></li></ul></div>
+          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><FooterLinks access={access} /></div>
           <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4><p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p></div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-white/55">© {new Date().getFullYear()} BraverTogether · Digital Legal Literacy Initiative</div>
       </footer>
     </div>
+  );
+}
+
+function FooterLinks({ access }: { access: AccountAccessHook }) {
+  const { user, loading, account } = access;
+  const publicLinks = nav.slice(1).map((item) => (
+    <li key={item.to}><Link to={item.to} className="hover:text-white">{item.label}</Link></li>
+  ));
+
+  if (loading) return <ul className="space-y-2 text-sm text-white/70">{publicLinks}</ul>;
+
+  if (!user) {
+    return (
+      <ul className="space-y-2 text-sm text-white/70">
+        {publicLinks}
+        <li><Link to="/advisors" className="hover:text-white">Ask an Advisor</Link></li>
+        <li><AdvisorIntentTrigger className="inline-flex items-center gap-1.5 font-semibold text-teal-soft hover:text-white"><UserRoundPlus className="h-3.5 w-3.5" /> Apply to be an Advisor</AdvisorIntentTrigger></li>
+      </ul>
+    );
+  }
+
+  if (account?.role === "administrator") {
+    return (
+      <ul className="space-y-2 text-sm text-white/70">
+        {publicLinks}
+        <li><Link to="/admin-advisors" className="hover:text-white">Advisor Applications</Link></li>
+        <li><Link to="/admin-competitions" className="hover:text-white">Competition Admin</Link></li>
+        <li><Link to="/profile" className="hover:text-white">Administrator Profile</Link></li>
+      </ul>
+    );
+  }
+
+  if (account?.role === "advisor") {
+    return (
+      <ul className="space-y-2 text-sm text-white/70">
+        {publicLinks}
+        <li><Link to="/messages" search={{ c: undefined, view: undefined }} className="hover:text-white">Advisor Inbox</Link></li>
+        <li><Link to="/messages" search={{ c: undefined, view: "queue" }} className="hover:text-white">Open Request Queue</Link></li>
+        <li><Link to="/profile" className="hover:text-white">Advisor Profile</Link></li>
+      </ul>
+    );
+  }
+
+  if (account?.role === "restricted") {
+    return (
+      <ul className="space-y-2 text-sm text-white/70">
+        {publicLinks}
+        <li><Link to="/profile" className="font-semibold text-teal-soft hover:text-white">Account access needs review</Link></li>
+      </ul>
+    );
+  }
+
+  const applicationLabel = account?.applicationStatus === "pending"
+    ? "Advisor application status"
+    : account?.isApplicant
+      ? "Continue advisor application"
+      : "Apply to be an Advisor";
+  return (
+    <ul className="space-y-2 text-sm text-white/70">
+      {publicLinks}
+      <li><Link to="/advisors" className="hover:text-white">Ask an Advisor</Link></li>
+      <li><Link to="/messages" search={{ c: undefined, view: undefined }} className="hover:text-white">My Support Requests</Link></li>
+      <li><Link to="/advisor-application" className="font-semibold text-teal-soft hover:text-white">{applicationLabel}</Link></li>
+    </ul>
   );
 }
 

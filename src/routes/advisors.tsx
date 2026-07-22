@@ -1,13 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BrainCircuit, BriefcaseBusiness, Calendar, CheckCircle2, Loader2, MessageCircle, Send, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, BrainCircuit, BriefcaseBusiness, Calendar, CheckCircle2, Loader2, MessageCircle, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
+import { useAccountAccess } from "@/hooks/use-account-access";
 import { supabase } from "@/integrations/supabase/client";
-import { createSupportRequest } from "@/lib/support.functions";
+import { roleHome } from "@/lib/account-access";
+import { createSupportRequest, listPublicAdvisors } from "@/lib/support.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/advisors")({
@@ -47,6 +49,8 @@ const topics = [
 function Advisors() {
   const navigate = useNavigate();
   const createRequest = useServerFn(createSupportRequest);
+  const getPublicAdvisors = useServerFn(listPublicAdvisors);
+  const access = useAccountAccess();
   const [advisors, setAdvisors] = useState<AdvisorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAdvisor, setSelectedAdvisor] = useState<AdvisorProfile | null>(null);
@@ -56,19 +60,16 @@ function Advisors() {
   const [message, setMessage] = useState("");
   const [allowAi, setAllowAi] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const memberExperience = !access.user || access.account?.role === "member";
 
   useEffect(() => {
-    void supabase.from("profiles")
-      .select("id, display_name, headline, bio, focus_areas, calendly_url, accepting_messages, availability_status, last_seen_at")
-      .eq("is_advisor", true)
-      .eq("is_public", true)
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) toast.error("Advisor profiles could not be loaded.");
-        setAdvisors((data ?? []) as AdvisorProfile[]);
+    void getPublicAdvisors()
+      .then((data) => setAdvisors(data as AdvisorProfile[]))
+      .catch(() => toast.error("Advisor profiles could not be loaded."))
+      .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [getPublicAdvisors]);
 
   const availableCount = useMemo(
     () => advisors.filter((advisor) => advisor.accepting_messages && advisor.availability_status === "available").length,
@@ -76,6 +77,15 @@ function Advisors() {
   );
 
   function openRequest(advisor: AdvisorProfile | null) {
+    if (access.loading) return;
+    if (!access.user) {
+      void navigate({ to: "/auth", search: { mode: "signin" } });
+      return;
+    }
+    if (access.account?.role !== "member") {
+      void navigate({ to: roleHome(access.account?.role ?? "restricted") });
+      return;
+    }
     setSelectedAdvisor(advisor);
     setFormOpen(true);
     setSubject(advisor ? `Question for ${advisor.display_name}` : "");
@@ -116,21 +126,11 @@ function Advisors() {
           <p className="mt-6 max-w-2xl text-lg text-navy-deep/70">
             This page starts a new support request. After you send it, use My Support Requests to read replies and continue the conversation.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button onClick={() => openRequest(null)} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
-              <Send className="h-4 w-4" /> Start a new support request
-            </button>
-            <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep">
-              <MessageCircle className="h-4 w-4" /> View my support requests
-            </button>
-            <AdvisorIntentTrigger className="inline-flex items-center gap-2 rounded-full border border-teal/35 bg-teal/10 px-6 py-3 font-semibold text-teal transition hover:bg-teal/15">
-              <UserRoundCheck className="h-4 w-4" /> Become an Advisor
-            </AdvisorIntentTrigger>
-          </div>
+          <RoleActions access={access} onStart={() => openRequest(null)} />
         </Section>
       </div>
 
-      <Section className="py-10">
+      {memberExperience && <Section className="py-10">
         <div className="rounded-2xl border-2 border-warn/35 bg-warn/5 p-6 sm:p-8">
           <div className="flex items-start gap-4">
             <AlertTriangle className="mt-1 h-6 w-6 shrink-0 text-warn" />
@@ -142,10 +142,10 @@ function Advisors() {
             </div>
           </div>
         </div>
-      </Section>
+      </Section>}
 
       <Section className="py-10">
-        <div className="grid items-start gap-8 lg:grid-cols-[1fr_360px]">
+        <div className={cn("grid items-start gap-8", memberExperience && "lg:grid-cols-[1fr_360px]")}>
           <div>
             <Eyebrow>Human advisors</Eyebrow>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
@@ -169,12 +169,12 @@ function Advisors() {
                   <button onClick={() => openRequest(null)} className="mt-5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Start a support request</button>
                 </div>
               ) : advisors.map((advisor) => (
-                <AdvisorCard key={advisor.id} advisor={advisor} onMessage={() => openRequest(advisor)} />
+                <AdvisorCard key={advisor.id} advisor={advisor} showMessage={memberExperience} onMessage={() => openRequest(advisor)} />
               ))}
             </div>
           </div>
 
-          <div className="space-y-5 lg:sticky lg:top-24">
+          {memberExperience && <div className="space-y-5 lg:sticky lg:top-24">
             <aside className="rounded-3xl border border-border bg-card p-6 shadow-card">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal/10 text-teal"><BrainCircuit className="h-6 w-6" /></div>
               <h2 className="mt-4 font-display text-2xl font-bold">Help while you wait</h2>
@@ -187,15 +187,15 @@ function Advisors() {
               <button onClick={() => openRequest(null)} className="mt-6 w-full rounded-full bg-mesh px-5 py-3 text-sm font-semibold text-white">Start a support request</button>
             </aside>
 
-            <aside className="rounded-3xl border border-border bg-secondary/45 p-6">
+            {(access.account?.role === "member" || !access.user) && <aside className="rounded-3xl border border-border bg-secondary/45 p-6">
               <BriefcaseBusiness className="h-7 w-7 text-teal" />
               <h2 className="mt-3 font-display text-xl font-bold">Volunteer as an advisor</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Law students, researchers, academics and qualified professionals can apply. Every application is reviewed before advisor access is granted.</p>
               <AdvisorIntentTrigger className="mt-5 inline-flex w-full items-center justify-center rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal">
                 Sign in or join, then apply
               </AdvisorIntentTrigger>
-            </aside>
-          </div>
+            </aside>}
+          </div>}
         </div>
       </Section>
 
@@ -238,7 +238,45 @@ function Advisors() {
   );
 }
 
-function AdvisorCard({ advisor, onMessage }: { advisor: AdvisorProfile; onMessage: () => void }) {
+function RoleActions({
+  access,
+  onStart,
+}: {
+  access: ReturnType<typeof useAccountAccess>;
+  onStart: () => void;
+}) {
+  const navigate = useNavigate();
+  const role = access.account?.role;
+
+  if (access.user && role === "advisor") {
+    return (
+      <div className="mt-8 flex flex-wrap gap-3">
+        <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: undefined } })} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow"><MessageCircle className="h-4 w-4" /> Open Advisor Inbox</button>
+        <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: "queue" } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep"><BriefcaseBusiness className="h-4 w-4" /> Open Request Queue</button>
+      </div>
+    );
+  }
+
+  if (access.user && role === "administrator") {
+    return <div className="mt-8"><button onClick={() => navigate({ to: "/admin-advisors" })} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow"><ShieldCheck className="h-4 w-4" /> Open Administration</button></div>;
+  }
+
+  if (access.user && role === "restricted") {
+    return <div className="mt-8"><button onClick={() => navigate({ to: "/profile" })} className="inline-flex items-center gap-2 rounded-full border border-warn/40 bg-warn/10 px-6 py-3 font-semibold text-warn"><AlertTriangle className="h-4 w-4" /> Review account access</button></div>;
+  }
+
+  return (
+    <div className="mt-8 flex flex-wrap gap-3">
+      <button onClick={onStart} className="inline-flex items-center gap-2 rounded-full bg-mesh px-6 py-3 font-semibold text-white shadow-glow">
+        <Send className="h-4 w-4" /> {access.user ? "Start a new support request" : "Sign in to ask an advisor"}
+      </button>
+      {access.user && <button onClick={() => navigate({ to: "/messages", search: { c: undefined, view: undefined } })} className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white/80 px-6 py-3 font-semibold text-navy-deep"><MessageCircle className="h-4 w-4" /> View my support requests</button>}
+      <AdvisorIntentTrigger className="inline-flex items-center gap-2 rounded-full border border-teal/35 bg-teal/10 px-6 py-3 font-semibold text-teal transition hover:bg-teal/15"><UserRoundCheck className="h-4 w-4" /> Become an Advisor</AdvisorIntentTrigger>
+    </div>
+  );
+}
+
+function AdvisorCard({ advisor, showMessage, onMessage }: { advisor: AdvisorProfile; showMessage: boolean; onMessage: () => void }) {
   const status = advisor.availability_status;
   return (
     <article className="flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:border-teal/40 hover:shadow-card">
@@ -256,7 +294,7 @@ function AdvisorCard({ advisor, onMessage }: { advisor: AdvisorProfile; onMessag
       {advisor.bio && <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{advisor.bio}</p>}
       {advisor.focus_areas?.length > 0 && <div className="mt-4 flex flex-wrap gap-1.5">{advisor.focus_areas.slice(0, 4).map((focus) => <span key={focus} className="rounded-full bg-teal/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal">{focus}</span>)}</div>}
       <div className="mt-auto flex gap-2 pt-5">
-        <button onClick={onMessage} disabled={!advisor.accepting_messages} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle className="h-3.5 w-3.5" /> Message</button>
+        {showMessage && <button onClick={onMessage} disabled={!advisor.accepting_messages} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle className="h-3.5 w-3.5" /> Message</button>}
         {advisor.calendly_url && <a href={advisor.calendly_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-full border border-border px-3 text-muted-foreground hover:text-foreground" title="Open booking page"><Calendar className="h-4 w-4" /></a>}
       </div>
     </article>

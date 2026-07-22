@@ -2,6 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { generateText } from "ai";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  loadAccountAccessState,
+  requireAccountRole,
+} from "@/lib/account-access.functions";
 import { consumeAiAllowance } from "./ai-rate-limit.server";
 import { createAiProvider } from "./ai-provider.server";
 
@@ -15,11 +19,61 @@ const CreateRequestInput = z.object({
   allowAiFallback: z.boolean().default(true),
 });
 
+const publicAdvisorFields =
+  "id, display_name, headline, bio, focus_areas, calendly_url, accepting_messages, availability_status, last_seen_at";
+
+async function approvedAdvisorIds(candidateIds: string[]): Promise<Set<string>> {
+  if (candidateIds.length === 0) return new Set();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [rolesResult, applicationsResult] = await Promise.all([
+    supabaseAdmin
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "advisor")
+      .in("user_id", candidateIds),
+    supabaseAdmin
+      .from("advisor_applications")
+      .select("user_id")
+      .eq("status", "approved")
+      .in("user_id", candidateIds),
+  ]);
+  if (rolesResult.error) throw new Error(rolesResult.error.message);
+  if (applicationsResult.error) throw new Error(applicationsResult.error.message);
+  const roleIds = new Set((rolesResult.data ?? []).map((row) => row.user_id));
+  return new Set(
+    (applicationsResult.data ?? [])
+      .map((row) => row.user_id)
+      .filter((userId) => roleIds.has(userId)),
+  );
+}
+
+export const listPublicAdvisors = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select(publicAdvisorFields)
+      .eq("is_advisor", true)
+      .eq("is_public", true)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const approvedIds = await approvedAdvisorIds(
+      (data ?? []).map((profile) => profile.id),
+    );
+    return (data ?? []).filter((profile) => approvedIds.has(profile.id));
+  },
+);
+
 export const createSupportRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => CreateRequestInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["member"]);
     if (data.advisorId) {
+      const advisorAccess = await loadAccountAccessState(data.advisorId);
+      if (advisorAccess.role !== "advisor") {
+        throw new Error("That advisor is not currently approved.");
+      }
       const { data: advisor } = await context.supabase
         .from("profiles")
         .select("id")
@@ -64,13 +118,8 @@ export const claimConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => ConversationInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["advisor"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: advisor } = await supabaseAdmin
-      .from("profiles")
-      .select("is_advisor, accepting_messages")
-      .eq("id", context.userId)
-      .maybeSingle();
-    if (!advisor?.is_advisor) throw new Error("Only approved advisors can claim requests.");
 
     const { data: claimed, error } = await supabaseAdmin
       .from("conversations")
@@ -98,6 +147,7 @@ export const setAdvisorAvailability = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => AvailabilityInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["advisor"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("profiles").update({
       availability_status: data.status,
@@ -143,10 +193,18 @@ export const askSupportAi = createServerFn({ method: "POST" })
     if (conversation.advisor_id) throw new Error("A human advisor is now handling this conversation.");
     if (!conversation.ai_fallback_enabled) throw new Error("AI fallback is not enabled for this request.");
 
-    const { count: availableCount } = await supabaseAdmin.from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_advisor", true).eq("is_public", true).eq("accepting_messages", true).eq("availability_status", "available");
-    if ((availableCount ?? 0) > 0) throw new Error("A human advisor is available. Your request is waiting in the advisor queue.");
+    const { data: availableProfiles, error: availableError } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("is_advisor", true)
+      .eq("is_public", true)
+      .eq("accepting_messages", true)
+      .eq("availability_status", "available");
+    if (availableError) throw new Error(availableError.message);
+    const availableApprovedIds = await approvedAdvisorIds(
+      (availableProfiles ?? []).map((profile) => profile.id),
+    );
+    if (availableApprovedIds.size > 0) throw new Error("A human advisor is available. Your request is waiting in the advisor queue.");
 
     const apiKey = process.env.SUPPORT_AI_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     const modelName = process.env.SUPPORT_AI_MODEL || process.env.AI_MODEL;

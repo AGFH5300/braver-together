@@ -9,7 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useAuth } from "@/hooks/use-auth";
+import { useAccountAccess } from "@/hooks/use-account-access";
+import { roleHome } from "@/lib/account-access";
 
 export function AdvisorIntentTrigger({
   children,
@@ -20,7 +21,7 @@ export function AdvisorIntentTrigger({
   className?: string;
   onNavigate?: () => void;
 }) {
-  const { user, loading } = useAuth();
+  const { user, account, loading } = useAccountAccess();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
@@ -28,7 +29,11 @@ export function AdvisorIntentTrigger({
     if (loading) return;
     if (user) {
       onNavigate?.();
-      await navigate({ to: "/advisor-application" });
+      if (account?.role === "member") {
+        await navigate({ to: "/advisor-application" });
+      } else {
+        await navigate({ to: roleHome(account?.role ?? "restricted") });
+      }
       return;
     }
     setOpen(true);

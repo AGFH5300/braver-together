@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarCheck2, CalendarPlus, Check, ExternalLink, Loader2, Video, X } from "lucide-react";
@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { roleHome, type EffectiveAccountRole } from "@/lib/account-access";
+import { getAccountAccessState } from "@/lib/account-access.functions";
 import { createMeetingProposal, listMeetingProposals, respondMeetingProposal } from "@/lib/meeting.functions";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,8 @@ export const Route = createFileRoute("/_authenticated/meetings")({
 });
 
 function MeetingsPage() {
+  const navigate = useNavigate();
+  const getAccess = useServerFn(getAccountAccessState);
   const createProposal = useServerFn(createMeetingProposal);
   const listProposals = useServerFn(listMeetingProposals);
   const respond = useServerFn(respondMeetingProposal);
@@ -51,6 +55,7 @@ function MeetingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [responding, setResponding] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [accountRole, setAccountRole] = useState<EffectiveAccountRole>("member");
   const [dateTime, setDateTime] = useState("");
   const [duration, setDuration] = useState(30);
   const [title, setTitle] = useState("BraverTogether advisor meeting");
@@ -75,9 +80,17 @@ function MeetingsPage() {
   async function initialize() {
     setLoading(true);
     try {
-      const { data: auth, error: authError } = await supabase.auth.getUser();
+      const [{ data: auth, error: authError }, access] = await Promise.all([
+        supabase.auth.getUser(),
+        getAccess(),
+      ]);
       if (authError) throw authError;
       if (!auth.user) throw new Error("Please sign in again.");
+      if (access.role !== "member" && access.role !== "advisor") {
+        await navigate({ to: roleHome(access.role), replace: true });
+        return;
+      }
+      setAccountRole(access.role);
       setMe(auth.user.id);
 
       const { data, error } = await supabase
@@ -154,7 +167,7 @@ function MeetingsPage() {
 
   return (
     <SiteLayout>
-      <div className="bg-hero"><Section className="py-14"><Eyebrow><CalendarCheck2 className="h-3.5 w-3.5" /> Meetings</Eyebrow><h1 className="mt-3 text-4xl font-bold text-navy-deep">Plan a conversation together.</h1><p className="mt-2 max-w-2xl text-navy-deep/70">Propose a time and secure meeting link, wait for the other person to accept, then add the confirmed meeting to your calendar.</p></Section></div>
+      <div className="bg-hero"><Section className="py-14"><Eyebrow><CalendarCheck2 className="h-3.5 w-3.5" /> {accountRole === "advisor" ? "Advisor meetings" : "My meetings"}</Eyebrow><h1 className="mt-3 text-4xl font-bold text-navy-deep">{accountRole === "advisor" ? "Meetings with assigned members" : "Meetings with your advisor"}</h1><p className="mt-2 max-w-2xl text-navy-deep/70">Propose a time and secure meeting link, wait for the other person to accept, then add the confirmed meeting to your calendar.</p></Section></div>
 
       <Section className="py-10">
         {loading ? <div className="py-20 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-teal" /></div> : conversations.length === 0 ? (
