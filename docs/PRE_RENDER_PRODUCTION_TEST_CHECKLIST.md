@@ -122,7 +122,7 @@ Signed out, test:
 - `/competitions`
 - `/decoder`
 - `/auth`
-- `/advisor-signup` redirects to the advisor-intent view of `/auth`
+- `/advisor-signup` redirects to ordinary member authentication
 
 Check:
 
@@ -137,10 +137,23 @@ Check:
 Using Student A:
 
 - open `/auth`
-- create a regular account
-- validate display name, email and minimum password length
+- open the advisor explanation modal and choose `Sign in to continue`
+- confirm `/auth?mode=signin` opens with the Sign in tab selected
+- switch between the Create account and Sign in tabs and confirm the URL and visible form stay synchronized
+- enter a full name and email to start regular member signup
 - verify missing community-rules acceptance is rejected
-- verify email confirmation flow when enabled
+- verify a six-digit email OTP is sent
+- verify Gmail, Outlook and default email-app shortcuts work
+- verify incomplete and invalid OTPs are rejected
+- verify OTP paste/autofill works
+- verify the resend control has a cooldown and sends a new code
+- verify Change email returns to the editable name/email step
+- after verification, create and confirm a password
+- verify both password visibility toggles
+- verify the five-level password-strength meter changes as the password improves
+- verify mismatched passwords are rejected
+- refresh before setting the password and confirm the flow recovers at the password step
+- verify successful password setup signs the member in automatically
 - sign in with correct credentials
 - sign in with incorrect credentials and confirm an in-page error
 - refresh and confirm the session persists
@@ -165,11 +178,11 @@ Using Advisor Applicant A:
 - create one ordinary member account through `/auth`
 - click `Apply to be an Advisor` from the authenticated desktop header
 - repeat from the mobile menu, `/advisors`, footer and regular auth page
-- confirm every entry uses the same `/auth?intent=advisor` account flow
-- confirm `/advisor-signup` redirects into that same flow and never shows a second signup form
-- confirm the page says that everyone starts as a member
-- confirm advisor access is granted only after approval
-- sign in with the existing member account
+- confirm signed-out entry points first show the advisor explanation modal
+- confirm the modal offers ordinary member account creation and ordinary sign-in
+- confirm neither action adds advisor intent or advisor-specific UI to `/auth`
+- confirm `/advisor-signup` redirects to ordinary member signup and never shows a second signup form
+- sign in with the existing member account through the modal
 - confirm the same account reaches `/advisor-application`
 
 Before and after submitting the application, manually open:
@@ -190,11 +203,13 @@ Expected result:
 
 Fresh-account advisor path:
 
-- open `/auth?intent=advisor` while signed out
-- create a member account in the same form used by every other user
-- confirm email if required
+- open the public advisor explanation modal while signed out
+- choose Create member account
+- confirm the ordinary `/auth?mode=signup` page opens
+- create a member account in the same OTP-first form used by every other user
+- verify the email OTP and set the password
 - sign in
-- confirm the member account continues to `/advisor-application`
+- use `Apply to be an Advisor` from the signed-in member navigation
 - confirm no separate advisor-applicant account is created
 
 ## 8. Advisor application fields
