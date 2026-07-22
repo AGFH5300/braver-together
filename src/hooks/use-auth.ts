@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+function completedAccountUser(user: User | null | undefined): User | null {
+  return user?.user_metadata?.signup_completed === false ? null : (user ?? null);
+}
+
 let cachedUser: User | null | undefined;
 let pendingUserRequest: Promise<User | null> | null = null;
 
@@ -9,7 +13,7 @@ function loadCurrentUser(): Promise<User | null> {
   if (cachedUser !== undefined) return Promise.resolve(cachedUser);
   if (!pendingUserRequest) {
     pendingUserRequest = supabase.auth.getUser().then(({ data }) => {
-      cachedUser = data.user ?? null;
+      cachedUser = completedAccountUser(data.user);
       return cachedUser;
     });
   }
@@ -30,7 +34,7 @@ export function useAuth() {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const nextUser = session?.user ?? null;
+      const nextUser = completedAccountUser(session?.user);
       cachedUser = nextUser;
       pendingUserRequest = Promise.resolve(nextUser);
       if (!mounted) return;
