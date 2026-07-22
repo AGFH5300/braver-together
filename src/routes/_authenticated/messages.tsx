@@ -164,6 +164,17 @@ function MessagesPage() {
     }
   }
 
+  if (!me) {
+    return (
+      <SiteLayout>
+        <Section className="py-24 text-center">
+          <Loader2 className="mx-auto h-7 w-7 animate-spin text-teal" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading your workspace…</p>
+        </Section>
+      </SiteLayout>
+    );
+  }
+
   return (
     <SiteLayout>
       <Section className="py-8 sm:py-10">
