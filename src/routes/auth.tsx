@@ -105,7 +105,7 @@ function AuthPage() {
   const continueAfterAuth = useCallback(async () => {
     await navigate({
       to: "/messages",
-      search: { c: undefined },
+      search: { c: undefined, view: undefined },
       replace: true,
     });
   }, [navigate]);
