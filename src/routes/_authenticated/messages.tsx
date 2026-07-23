@@ -19,6 +19,8 @@ import {
 import { toast } from "sonner";
 import { SiteLayout, Section } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { roleHome } from "@/lib/account-access";
+import { getAccountAccessState } from "@/lib/account-access.functions";
 import { askSupportAi, claimConversation, closeConversation } from "@/lib/support.functions";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +77,7 @@ function MessagesPage() {
   const { c: activeId, view } = Route.useSearch();
   const navigate = useNavigate();
   const claim = useServerFn(claimConversation);
+  const getAccess = useServerFn(getAccountAccessState);
   const [me, setMe] = useState<MeProfile | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,14 +91,21 @@ function MessagesPage() {
   useEffect(() => {
     let cancelled = false;
     async function initialize() {
-      const { data: auth } = await supabase.auth.getUser();
+      const [{ data: auth }, access] = await Promise.all([
+        supabase.auth.getUser(),
+        getAccess(),
+      ]);
       if (!auth.user || cancelled) return;
-      const { data: profile } = await supabase.from("profiles").select("id, is_advisor, display_name").eq("id", auth.user.id).maybeSingle();
-      if (!cancelled) setMe({ id: auth.user.id, is_advisor: profile?.is_advisor ?? false, display_name: profile?.display_name || "Member" });
+      if (access.role !== "member" && access.role !== "advisor") {
+        await navigate({ to: roleHome(access.role), replace: true });
+        return;
+      }
+      const { data: profile } = await supabase.from("profiles").select("id, display_name").eq("id", auth.user.id).maybeSingle();
+      if (!cancelled) setMe({ id: auth.user.id, is_advisor: access.role === "advisor", display_name: profile?.display_name || (access.role === "advisor" ? "Advisor" : "Member") });
     }
     void initialize();
     return () => { cancelled = true; };
-  }, []);
+  }, [getAccess, navigate]);
 
   useEffect(() => {
     if (!me) return;

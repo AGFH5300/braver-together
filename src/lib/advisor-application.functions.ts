@@ -2,6 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  loadAccountAccessState,
+  requireAccountRole,
+} from "@/lib/account-access.functions";
 
 export const ADVISOR_CV_BUCKET = "advisor-cvs";
 export const MAX_ADVISOR_CV_BYTES = 5 * 1024 * 1024;
@@ -92,14 +96,8 @@ function validateMagicBytes(bytes: Uint8Array, mimeType: string) {
 }
 
 async function requireAdmin(userId: string) {
+  await requireAccountRole(userId, ["administrator"]);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("user_roles")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (!data) throw new Error("Administrator access is required.");
   return supabaseAdmin;
 }
 
@@ -124,6 +122,7 @@ async function ensureAdvisorIntent(userId: string) {
 export const beginAdvisorOnboarding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    await requireAccountRole(context.userId, ["member"]);
     const { completed } = await ensureAdvisorIntent(context.userId);
     return { required: !completed };
   });
@@ -131,75 +130,37 @@ export const beginAdvisorOnboarding = createServerFn({ method: "POST" })
 export const getAdvisorOnboardingGate = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const [{ data: intent }, { data: application }, { data: profile }, { data: adminRole }, { data: advisorRole }] = await Promise.all([
-      supabaseAdmin
-        .from("advisor_onboarding_intents")
-        .select("completed_at")
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("advisor_applications")
-        .select("status")
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      supabaseAdmin.from("profiles").select("is_advisor").eq("id", context.userId).maybeSingle(),
-      supabaseAdmin
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", context.userId)
-        .eq("role", "admin")
-        .maybeSingle(),
-      supabaseAdmin
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", context.userId)
-        .eq("role", "advisor")
-        .maybeSingle(),
-    ]);
-
-    const isApplicant = Boolean(intent || application);
-    const isAdmin = Boolean(adminRole);
-    const isAdvisor = Boolean(profile?.is_advisor && advisorRole);
-    const required = Boolean(
-      isApplicant
-      && !isAdvisor
-      && !isAdmin
-      && application?.status !== "approved",
-    );
+    const access = await loadAccountAccessState(context.userId);
     return {
-      required,
-      applicationStatus: application?.status ?? null,
-      isApplicant,
-      isAdvisor,
-      isAdmin,
+      ...access,
+      required: access.role === "member" && access.isApplicant,
+      isAdvisor: access.role === "advisor",
+      isAdmin: access.role === "administrator",
     };
   });
 
 export const getAdvisorPortalState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await ensureAdvisorIntent(context.userId);
-    const [{ data: application }, { data: adminRole }, { data: profile }] = await Promise.all([
-      supabaseAdmin
-        .from("advisor_applications")
-        .select("id, full_name, email, organization, role_title, location, experience, motivation, focus_areas, profile_url, availability_note, status, admin_note, submitted_at, updated_at, reviewed_at, cv_original_filename, cv_mime_type, cv_file_size")
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", context.userId)
-        .eq("role", "admin")
-        .maybeSingle(),
-      supabaseAdmin.from("profiles").select("is_advisor").eq("id", context.userId).maybeSingle(),
-    ]);
+    const access = await loadAccountAccessState(context.userId);
+    const { supabaseAdmin } =
+      access.role === "member"
+        ? await ensureAdvisorIntent(context.userId)
+        : await import("@/integrations/supabase/client.server");
+    const { data: application } = await supabaseAdmin
+      .from("advisor_applications")
+      .select("id, full_name, email, organization, role_title, location, experience, motivation, focus_areas, profile_url, availability_note, status, admin_note, submitted_at, updated_at, reviewed_at, cv_original_filename, cv_mime_type, cv_file_size")
+      .eq("user_id", context.userId)
+      .maybeSingle();
 
     return {
       application,
-      isAdmin: Boolean(adminRole),
-      isAdvisor: Boolean(profile?.is_advisor),
-      applicationRequired: !profile?.is_advisor && !adminRole && application?.status !== "approved",
+      role: access.role,
+      hasRoleConflict: access.hasRoleConflict,
+      isAdmin: access.role === "administrator",
+      isAdvisor: access.role === "advisor",
+      applicationRequired:
+        access.role === "member" && application?.status !== "approved",
     };
   });
 
@@ -207,6 +168,7 @@ export const submitAdvisorApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => ApplicationInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["member"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("advisor_applications")
@@ -267,6 +229,7 @@ export const prepareAdvisorCvUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => PrepareCvInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["member"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     validateCvMetadata(data.originalFilename, data.mimeType, data.fileSize);
 
@@ -342,6 +305,7 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((value: unknown) => FinalizeCvInput.parse(value))
   .handler(async ({ data, context }) => {
+    await requireAccountRole(context.userId, ["member"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: application, error: readError } = await supabaseAdmin
       .from("advisor_applications")

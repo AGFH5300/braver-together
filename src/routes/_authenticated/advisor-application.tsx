@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { roleHome } from "@/lib/account-access";
 import {
   ADVISOR_CV_BUCKET,
   MAX_ADVISOR_CV_BYTES,
@@ -114,6 +115,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 function AdvisorApplicationPage() {
+  const navigate = useNavigate();
   const getPortalState = useServerFn(getAdvisorPortalState);
   const submitApplication = useServerFn(submitAdvisorApplication);
   const prepareCv = useServerFn(prepareAdvisorCvUpload);
@@ -142,6 +144,10 @@ function AdvisorApplicationPage() {
     setLoading(true);
     try {
       const [{ data: auth }, state] = await Promise.all([supabase.auth.getUser(), getPortalState()]);
+      if (state.role !== "member") {
+        await navigate({ to: roleHome(state.role), replace: true });
+        return;
+      }
       const existing = state.application as ExistingApplication | null;
       setApplication(existing);
       setIsAdmin(state.isAdmin);

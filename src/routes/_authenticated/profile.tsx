@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { Calendar, Loader2, Save, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { AlertTriangle, Calendar, Loader2, Save, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import { supabase } from "@/integrations/supabase/client";
+import type { EffectiveAccountRole } from "@/lib/account-access";
+import { getAccountAccessState } from "@/lib/account-access.functions";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
@@ -45,9 +48,11 @@ function normalizeBookingUrl(value: string): string | null {
 }
 
 function ProfilePage() {
+  const getAccess = useServerFn(getAccountAccessState);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProfileForm>(EMPTY_PROFILE);
+  const [accountRole, setAccountRole] = useState<EffectiveAccountRole>("member");
 
   useEffect(() => {
     void load();
@@ -55,9 +60,13 @@ function ProfilePage() {
 
   async function load() {
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const [{ data: authData, error: authError }, access] = await Promise.all([
+        supabase.auth.getUser(),
+        getAccess(),
+      ]);
       if (authError) throw authError;
       if (!authData.user) throw new Error("Your session has expired. Please sign in again.");
+      setAccountRole(access.role);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -74,7 +83,7 @@ function ProfilePage() {
           focus_areas: (data.focus_areas ?? []).join(", "),
           calendly_url: data.calendly_url ?? "",
           accepting_messages: data.accepting_messages ?? true,
-          is_advisor: data.is_advisor ?? false,
+          is_advisor: access.role === "advisor",
           is_public: data.is_public ?? false,
           availability_status: (data.availability_status as ProfileForm["availability_status"]) ?? "offline",
           max_active_conversations: data.max_active_conversations ?? 5,
@@ -105,7 +114,7 @@ function ProfilePage() {
         focus_areas: focusAreas,
         calendly_url: bookingUrl,
       };
-      const advisorSettings = form.is_advisor ? {
+      const advisorSettings = accountRole === "advisor" ? {
         accepting_messages: form.accepting_messages,
         is_public: form.is_public,
         availability_status: form.availability_status,
@@ -140,14 +149,18 @@ function ProfilePage() {
     <SiteLayout>
       <div className="bg-hero">
         <Section className="py-14">
-          <Eyebrow>{form.is_advisor ? "Advisor profile" : "Member profile"}</Eyebrow>
+          <Eyebrow>{accountRole === "advisor" ? "Advisor profile" : accountRole === "administrator" ? "Administrator profile" : accountRole === "restricted" ? "Account review" : "Member profile"}</Eyebrow>
           <h1 className="mt-3 text-4xl font-bold text-navy-deep">
-            {form.is_advisor ? "Advisor profile and availability" : "My member profile"}
+            {accountRole === "advisor" ? "Advisor profile and availability" : accountRole === "administrator" ? "My administrator profile" : accountRole === "restricted" ? "Account access needs review" : "My member profile"}
           </h1>
           <p className="mt-2 max-w-xl text-navy-deep/70">
-            {form.is_advisor
+            {accountRole === "advisor"
               ? "Manage the information members see and control whether you can receive new support requests."
-              : "Manage your member information. Advisor access is a separate application and approval process."}
+              : accountRole === "administrator"
+                ? "Manage your personal profile. Administration tools are available from the clearly labelled administrator workspace."
+                : accountRole === "restricted"
+                  ? "Your account records do not agree, so member, advisor and administrator actions are disabled until an administrator reviews them."
+                  : "Manage your member information. Advisor access is a separate application and approval process."}
           </p>
         </Section>
       </div>
@@ -160,16 +173,16 @@ function ProfilePage() {
           <Field label="Focus areas (comma-separated)" value={form.focus_areas} onChange={(value) => setForm((current) => ({ ...current, focus_areas: value }))} placeholder="Data privacy, online safety, copyright" maxLength={600} />
 
           <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal" /><div className="font-display font-bold">{form.is_advisor ? "Advisor settings" : "Optional advisor application"}</div></div>
+            <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal" /><div className="font-display font-bold">{accountRole === "advisor" ? "Advisor settings" : accountRole === "administrator" ? "Administrator account" : accountRole === "restricted" ? "Access review required" : "Optional advisor application"}</div></div>
 
-            {!form.is_advisor ? (
+            {accountRole === "member" ? (
               <div className="rounded-xl border border-border bg-secondary/50 p-5">
                 <UserRoundCheck className="h-7 w-7 text-teal" />
                 <h2 className="mt-3 text-lg font-bold">Interested in becoming an advisor?</h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">You are currently a member. You can apply with your background and areas of interest, but you remain a member unless an administrator approves the application.</p>
                 <Link to="/advisor-application" className="mt-4 inline-flex rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Open advisor application</Link>
               </div>
-            ) : (
+            ) : accountRole === "advisor" ? (
               <>
                 <div className="flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-xs text-navy-deep"><ShieldCheck className="h-4 w-4 text-teal" />Your advisor account is approved.</div>
                 <Toggle label="Publish my advisor profile" desc="Show my profile on the Ask an Advisor page" checked={form.is_public} onChange={(value) => setForm((current) => ({ ...current, is_public: value }))} />
@@ -190,6 +203,18 @@ function ProfilePage() {
                 <Field label="Optional booking page" type="url" placeholder="https://calendly.com/your-name/intro-call" value={form.calendly_url} onChange={(value) => setForm((current) => ({ ...current, calendly_url: value }))} icon={Calendar} maxLength={500} />
                 <p className="text-xs text-muted-foreground">Students and advisors can also propose a specific time and meeting link from the Meetings page.</p>
               </>
+            ) : accountRole === "administrator" ? (
+              <div className="rounded-xl border border-navy/20 bg-secondary/50 p-5">
+                <ShieldCheck className="h-7 w-7 text-navy" />
+                <h2 className="mt-3 text-lg font-bold">Signed in as Administrator</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">This profile does not expose member request controls or advisor availability. Use the administrator navigation for applications and competition management.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-warn/35 bg-warn/10 p-5">
+                <AlertTriangle className="h-7 w-7 text-warn" />
+                <h2 className="mt-3 text-lg font-bold">Role records need administrator review</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">No privileged or member workflow has been assigned while the records conflict. Your general profile can still be saved.</p>
+              </div>
             )}
           </div>
 
