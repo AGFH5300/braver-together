@@ -229,21 +229,25 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Digital Legal Literacy</span>
             </div>
           </Link>
-          <nav className="hidden min-w-0 flex-1 flex-wrap items-center justify-end gap-0.5 2xl:flex">
+          <nav className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 xl:flex">
             {nav.map((item) => (
               <Link key={item.to} to={item.to} className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground" activeProps={{ className: "text-foreground bg-secondary" }} activeOptions={{ exact: item.to === "/" }}>
                 {item.label}
               </Link>
             ))}
             <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">Contract Decoder</Link>
-            <div className="ml-1 shrink-0 border-l border-border pl-2"><AuthControls access={access} /></div>
           </nav>
-          <button onClick={() => setOpen(!open)} className="rounded-md p-2 hover:bg-secondary 2xl:hidden" aria-label={open ? "Close menu" : "Open menu"}>
+          <button onClick={() => setOpen(!open)} className="rounded-md p-2 hover:bg-secondary xl:hidden" aria-label={open ? "Close menu" : "Open menu"}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
+        <div className="hidden border-t border-border/60 xl:block">
+          <div className="mx-auto flex max-w-[1800px] justify-end px-4 py-2 sm:px-6">
+            <AuthControls access={access} />
+          </div>
+        </div>
         {open && (
-          <div className="border-t border-border bg-background 2xl:hidden">
+          <div className="border-t border-border bg-background xl:hidden">
             <div className="flex flex-col gap-1 px-4 py-3">
               {nav.map((item) => (
                 <Link key={item.to} to={item.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary">{item.label}</Link>
