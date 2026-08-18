@@ -1,15 +1,60 @@
-# BraverTogether production auth email setup
+# BraverTogether auth email setup
 
 Production domain: `https://bravertogether.site`
 
+Current pre-production test URL:
+
+```text
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev
+```
+
 This project uses Supabase Auth for account email and Resend as the SMTP delivery provider. Keep all SMTP/API credentials in Supabase or another server-side secret store; never expose them through a `VITE_` environment variable or commit them to the repository.
+
+## 0. Current Replit testing configuration
+
+Until the production site is ready, Supabase Auth must treat the Replit deployment as the application URL.
+
+Set **Authentication → URL Configuration → Site URL** to:
+
+```text
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev
+```
+
+Allow at least these redirect URLs:
+
+```text
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev/**
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev/auth
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev/auth?mode=signup
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev/auth?mode=signin
+https://15a9da87-ca3d-4518-8bf6-2007d838fa9a-00-j9a7eb5wvk7e.pike.replit.dev/auth?mode=signin&recovery=1
+```
+
+The application deliberately builds signup, OAuth and password-recovery redirects from `window.location.origin`, so the same code works on Replit now and on the production domain later without hard-coding either host.
+
+Do **not** make `bravertogether.site` the Supabase Site URL until the production deployment is ready. The Resend sending domain is independent and may be verified before the website moves to the production domain.
+
+For the current hosted Supabase project keep:
+
+```text
+Email provider: enabled
+Allow email signups: enabled
+Email confirmation: enabled
+Automatic email confirmation: disabled
+Secure email change: enabled
+OTP length: 6 digits
+OTP expiry: 600 seconds
+Resend/request cooldown: 60 seconds
+```
+
+Enable leaked-password protection before public launch. Supabase Security Advisor currently reports this protection as disabled.
 
 ## 1. Domain layout
 
 Keep the application, outbound mail and optional Supabase Auth custom domain separate:
 
 ```text
-bravertogether.site        public website
+bravertogether.site        public website (later)
 mail.bravertogether.site   Resend authentication-email sending domain
 auth.bravertogether.site   reserved for a future Supabase Auth custom domain
 ```
@@ -54,15 +99,15 @@ Password: <Resend sending-only API key>
 
 Keep email authentication enabled and keep automatic email confirmation disabled. The member signup flow verifies the email OTP itself before the user sets a password.
 
-## 4. Supabase URL configuration
+## 4. Production URL configuration later
 
-Set the hosted Auth Site URL to:
+When the production deployment is ready, change the hosted Auth Site URL to:
 
 ```text
 https://bravertogether.site
 ```
 
-Allow these redirect URLs at minimum:
+Allow these production redirect URLs at minimum:
 
 ```text
 https://bravertogether.site/auth
@@ -71,7 +116,7 @@ https://bravertogether.site/auth?mode=signin
 https://bravertogether.site/auth?mode=signin&recovery=1
 ```
 
-Keep the development URLs that are still actively used by the team, but do not use a preview/dev URL as the Site URL in production.
+Keep the Replit URL temporarily allow-listed only while it is still an intentional test environment.
 
 A Supabase Auth custom domain is optional and separate from SMTP. If enabled later, use the reserved hostname `auth.bravertogether.site` so authentication links can use your own domain without interfering with Resend's `mail.bravertogether.site` DNS records.
 
@@ -141,27 +186,44 @@ HTML:
 </html>
 ```
 
-## 7. Email-change and security notifications
+The app requests the recovery redirect using `window.location.origin`, so while testing it resolves to the Replit `/auth?mode=signin&recovery=1` route and later resolves to the same route on `bravertogether.site`.
+
+## 7. Remaining authentication templates
+
+Brand the remaining hosted Supabase Auth templates so no default Supabase wording is exposed:
+
+- Confirm signup: `Confirm your BraverTogether account` and use `{{ .ConfirmationURL }}`.
+- Invite user: `You've been invited to BraverTogether` and use `{{ .ConfirmationURL }}`.
+- Change email address: `Confirm your new BraverTogether email address` and use `{{ .ConfirmationURL }}`.
+- Reauthentication: `{{ .Token }} is your BraverTogether verification code` and render the six-digit `{{ .Token }}`.
+
+The current signup flow normally uses the Magic Link/OTP template rather than Confirm Signup, but the fallback templates must still be branded and valid.
+
+## 8. Email-change and security notifications
 
 Keep **Secure email change** enabled. If account email changes are exposed in the product, configure the Email Change template and require verification before the new address becomes authoritative.
 
-Enable Supabase security notification emails for at least:
+Enable Supabase security notification emails for:
 
 - password changed
 - email changed
+- phone changed
 - identity linked
 - identity unlinked
-- MFA factor enrolled/unenrolled if MFA is later exposed
+- MFA factor enrolled
+- MFA factor unenrolled
 
 Authentication/security notification emails should use the same `no-reply@mail.bravertogether.site` sender and remain short and transactional.
 
-## 8. Rate limits and abuse controls
+## 9. Rate limits and abuse controls
 
-After custom SMTP is enabled, review **Authentication → Rate Limits**. Do not raise limits until the normal flows have been tested. Signup OTP, recovery, and resend endpoints should remain rate-limited.
+After custom SMTP is enabled, review **Authentication → Rate Limits**. Do not raise limits until the normal flows have been tested. Keep the OTP/magic-link, signup-confirmation and password-reset request intervals aligned with the UI's 60-second resend cooldown.
 
 Before public launch, configure Supabase Auth CAPTCHA protection for public signup and password recovery if bot traffic is expected.
 
-## 9. Required end-to-end email tests
+Enable leaked-password protection before public launch.
+
+## 10. Required end-to-end email tests on Replit
 
 Run these using real inboxes from at least Gmail and Outlook:
 
@@ -169,14 +231,18 @@ Run these using real inboxes from at least Gmail and Outlook:
 2. Correct OTP verifies; wrong/expired OTP is rejected.
 3. Resend is blocked during the 60-second cooldown, then sends a fresh code.
 4. Setting the initial password completes the account and the session works after refresh.
-5. Existing account cannot accidentally restart signup as a new account.
-6. Forgot-password request returns a neutral success message whether or not the account exists.
-7. Recovery email arrives and its button lands only on `https://bravertogether.site`.
-8. Recovery token can be used once; a reused/expired link fails safely.
-9. New password works; old password no longer works.
-10. Password-changed security notification arrives.
-11. If email change is enabled in the UI, both the confirmation and email-changed security notification are tested.
-12. Google OAuth remains disabled until its provider credentials and exact production callback URLs are configured.
-13. No auth email contains a Resend tracking redirect.
-14. SPF and DKIM pass; DMARC alignment is checked after DMARC is published.
-15. Supabase Auth logs and Resend delivery logs show no unexpected rejects, bounces or rate-limit errors.
+5. The new Auth user automatically receives a profile row and the database `teen` role, which the app exposes as member access.
+6. Existing account cannot accidentally restart signup as a new account.
+7. Forgot-password request returns a neutral success message whether or not the account exists.
+8. Recovery email arrives and its button returns to the Replit `/auth?mode=signin&recovery=1` route.
+9. Recovery token can be used once; a reused/expired link fails safely.
+10. New password works; old password no longer works.
+11. Password-changed security notification arrives.
+12. If email change is enabled in the UI, both the confirmation and email-changed security notification are tested.
+13. Google OAuth remains disabled until its provider credentials and exact callback URLs are configured.
+14. No auth email contains a Resend tracking redirect.
+15. SPF and DKIM pass; DMARC alignment is checked after DMARC is published.
+16. Supabase Auth logs and Resend delivery logs show no unexpected rejects, bounces or rate-limit errors.
+17. Browser DevTools contain no SMTP password, Resend API key, service-role key or other server-only secret.
+
+After these tests pass and the production deployment is ready, switch only the Supabase Site URL/redirect allow list to `bravertogether.site`; the Resend SMTP configuration can remain unchanged.
