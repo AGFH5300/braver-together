@@ -31,10 +31,12 @@ import { cn } from "@/lib/utils";
 
 const AuthSearch = z.object({
   mode: z.enum(["signup", "signin"]).optional(),
+  recovery: z.literal("1").optional(),
 });
 
 type AuthMode = "signin" | "signup";
 type SignupStep = "details" | "otp" | "password";
+type RecoveryStep = "none" | "request" | "update";
 
 type SignupDraft = {
   email: string;
@@ -88,9 +90,12 @@ function saveSignupDraft(draft: SignupDraft) {
 function AuthPage() {
   const navigate = useNavigate();
   const getAccess = useServerFn(getAccountAccessState);
-  const { mode: requestedMode } = Route.useSearch();
+  const { mode: requestedMode, recovery: requestedRecovery } = Route.useSearch();
   const [mode, setMode] = useState<AuthMode>(requestedMode ?? "signup");
   const [signupStep, setSignupStep] = useState<SignupStep>("details");
+  const [recoveryStep, setRecoveryStep] = useState<RecoveryStep>(
+    requestedRecovery === "1" ? "update" : "none",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -120,50 +125,78 @@ function AuthPage() {
   useEffect(() => {
     const nextMode = requestedMode ?? "signup";
     setMode((currentMode) => {
-      if (currentMode !== nextMode) setInlineMessage(null);
+      if (currentMode !== nextMode && recoveryStep === "none") {
+        setInlineMessage(null);
+      }
       return nextMode;
     });
-  }, [requestedMode]);
+  }, [requestedMode, recoveryStep]);
 
   useEffect(() => {
     let cancelled = false;
     const draft = readSignupDraft();
     const initialMode = new URLSearchParams(window.location.search).get("mode");
-    if (draft && initialMode !== "signin") {
+    const isRecoveryReturn = requestedRecovery === "1";
+
+    if (!isRecoveryReturn && draft && initialMode !== "signin") {
       setEmail(draft.email);
       setFullName(draft.fullName);
       setSignupStep(draft.step);
       if (draft.step !== "details") setMode("signup");
-    } else if (draft?.step !== "password" && initialMode === "signin") {
+    } else if (!isRecoveryReturn && draft?.step !== "password" && initialMode === "signin") {
       window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
     }
 
-    void supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      const unfinishedSignup =
-        data.user?.user_metadata?.signup_completed === false;
-      if (data.user && (draft?.step === "password" || unfinishedSignup)) {
-        const recoveredName =
-          draft?.fullName ||
-          data.user.user_metadata?.full_name ||
-          data.user.user_metadata?.display_name ||
-          "";
-        setMode("signup");
-        setSignupStep("password");
-        setEmail(draft?.email || data.user.email || "");
-        setFullName(recoveredName);
-        if (data.user.email) {
-          saveSignupDraft({
-            email: data.user.email,
-            fullName: recoveredName,
-            step: "password",
-          });
+    async function hydrate() {
+      try {
+        if (isRecoveryReturn) {
+          setMode("signin");
+          setRecoveryStep("update");
+          window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+
+          const { data, error } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (error || !data.session?.user) {
+            setRecoveryStep("request");
+            setInlineMessage(
+              "This password reset link is invalid or has expired. Request a new reset email below.",
+            );
+          }
+          return;
         }
-      } else if (data.user) {
-        void continueAfterAuth();
+
+        const { data, error } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (error && !data.user) return;
+
+        const unfinishedSignup =
+          data.user?.user_metadata?.signup_completed === false;
+        if (data.user && (draft?.step === "password" || unfinishedSignup)) {
+          const recoveredName =
+            draft?.fullName ||
+            data.user.user_metadata?.full_name ||
+            data.user.user_metadata?.display_name ||
+            "";
+          setMode("signup");
+          setSignupStep("password");
+          setEmail(draft?.email || data.user.email || "");
+          setFullName(recoveredName);
+          if (data.user.email) {
+            saveSignupDraft({
+              email: data.user.email,
+              fullName: recoveredName,
+              step: "password",
+            });
+          }
+        } else if (data.user) {
+          void continueAfterAuth();
+        }
+      } finally {
+        if (!cancelled) setHydrating(false);
       }
-      setHydrating(false);
-    });
+    }
+
+    void hydrate();
 
     const resetTransientState = () => setGoogleLoading(false);
     window.addEventListener("pageshow", resetTransientState);
@@ -173,7 +206,7 @@ function AuthPage() {
       window.removeEventListener("pageshow", resetTransientState);
       document.removeEventListener("visibilitychange", resetTransientState);
     };
-  }, [continueAfterAuth]);
+  }, [continueAfterAuth, requestedRecovery]);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -185,11 +218,18 @@ function AuthPage() {
 
   async function changeMode(nextMode: AuthMode) {
     if (
+      recoveryStep === "none" &&
       nextMode === mode &&
       (nextMode === "signin" || signupStep === "details")
-    )
+    ) {
       return;
-    if (signupStep === "password") await supabase.auth.signOut();
+    }
+
+    if (signupStep === "password" || recoveryStep === "update") {
+      await supabase.auth.signOut();
+    }
+
+    setRecoveryStep("none");
     setMode(nextMode);
     setSignupStep("details");
     setInlineMessage(null);
@@ -197,7 +237,33 @@ function AuthPage() {
     setConfirmPassword("");
     setOtp("");
     window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
-    await navigate({ to: "/auth", search: { mode: nextMode }, replace: true });
+    await navigate({
+      to: "/auth",
+      search: { mode: nextMode, recovery: undefined },
+      replace: true,
+    });
+  }
+
+  function openRecoveryRequest() {
+    setMode("signin");
+    setRecoveryStep("request");
+    setPassword("");
+    setConfirmPassword("");
+    setInlineMessage(null);
+  }
+
+  async function backToSignIn() {
+    if (recoveryStep === "update") await supabase.auth.signOut();
+    setRecoveryStep("none");
+    setMode("signin");
+    setPassword("");
+    setConfirmPassword("");
+    setInlineMessage(null);
+    await navigate({
+      to: "/auth",
+      search: { mode: "signin", recovery: undefined },
+      replace: true,
+    });
   }
 
   async function handleGoogle() {
@@ -296,8 +362,9 @@ function AuthPage() {
         type: "email",
       });
       if (error) throw error;
-      if (!data.user || !data.session)
+      if (!data.user || !data.session) {
         throw new Error("Email verification did not create a session.");
+      }
 
       if (data.user.user_metadata?.signup_completed !== false) {
         await supabase.auth.signOut();
@@ -311,7 +378,7 @@ function AuthPage() {
         );
         await navigate({
           to: "/auth",
-          search: { mode: "signin" },
+          search: { mode: "signin", recovery: undefined },
           replace: true,
         });
         return;
@@ -416,6 +483,76 @@ function AuthPage() {
     }
   }
 
+  async function requestPasswordReset() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setInlineMessage("Please enter your email address.");
+      return;
+    }
+
+    setFormLoading(true);
+    setInlineMessage(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${window.location.origin}/auth?mode=signin&recovery=1`,
+      });
+      if (error) throw error;
+      setEmail(normalizedEmail);
+      setInlineMessage(
+        "If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.",
+      );
+    } catch (error) {
+      showError(error, "The password reset email could not be sent.");
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
+  async function updateRecoveredPassword() {
+    if (password.length < 8) {
+      setInlineMessage("Use at least 8 characters for your new password.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setInlineMessage("Passwords do not match.");
+      return;
+    }
+
+    setFormLoading(true);
+    setInlineMessage(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.user) {
+        throw new Error(
+          "This password reset session is no longer valid. Request a new reset email.",
+        );
+      }
+
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+
+      await supabase.auth.signOut();
+      setRecoveryStep("none");
+      setPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      toast.success("Password updated");
+      setInlineMessage(
+        "Your password has been updated. Sign in with your new password.",
+      );
+      await navigate({
+        to: "/auth",
+        search: { mode: "signin", recovery: undefined },
+        replace: true,
+      });
+    } catch (error) {
+      showError(error, "Your password could not be updated.");
+    } finally {
+      setFormLoading(false);
+    }
+  }
+
   function showError(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     setInlineMessage(message);
@@ -425,11 +562,13 @@ function AuthPage() {
   const busy = formLoading || googleLoading || hydrating;
   const passwordsMatch =
     confirmPassword.length > 0 && password === confirmPassword;
-  const heading = getHeading(mode, signupStep);
+  const heading = getHeading(mode, signupStep, recoveryStep);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (mode === "signin") void signIn();
+    if (recoveryStep === "request") void requestPasswordReset();
+    else if (recoveryStep === "update") void updateRecoveredPassword();
+    else if (mode === "signin") void signIn();
     else if (signupStep === "details") void sendSignupOtp();
     else if (signupStep === "otp") void verifySignupOtp();
     else void setSignupPassword();
@@ -448,27 +587,38 @@ function AuthPage() {
             <p className="mt-3 text-navy-deep/70">{heading.description}</p>
 
             <div className="mt-8 rounded-2xl border border-border bg-card/95 p-6 shadow-card backdrop-blur">
-              <div
-                className="grid grid-cols-2 rounded-xl bg-secondary p-1"
-                aria-label="Account action"
-              >
+              {recoveryStep === "none" ? (
+                <div
+                  className="grid grid-cols-2 rounded-xl bg-secondary p-1"
+                  aria-label="Account action"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void changeMode("signup")}
+                    className={tabClass(mode === "signup")}
+                  >
+                    Create account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void changeMode("signin")}
+                    className={tabClass(mode === "signin")}
+                  >
+                    Sign in
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => void changeMode("signup")}
-                  className={tabClass(mode === "signup")}
+                  onClick={() => void backToSignIn()}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal hover:underline disabled:opacity-50"
                 >
-                  Create account
+                  <ArrowLeft className="h-4 w-4" /> Back to sign in
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void changeMode("signin")}
-                  className={tabClass(mode === "signin")}
-                >
-                  Sign in
-                </button>
-              </div>
+              )}
 
-              {signupStep === "details" && (
+              {recoveryStep === "none" && signupStep === "details" && (
                 <>
                   <button
                     type="button"
@@ -492,8 +642,12 @@ function AuthPage() {
                 </>
               )}
 
-              {signupStep === "otp" && <SignupProgress current={2} />}
-              {signupStep === "password" && <SignupProgress current={3} />}
+              {recoveryStep === "none" && signupStep === "otp" && (
+                <SignupProgress current={2} />
+              )}
+              {recoveryStep === "none" && signupStep === "password" && (
+                <SignupProgress current={3} />
+              )}
 
               {inlineMessage && (
                 <div
@@ -506,7 +660,35 @@ function AuthPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                {mode === "signup" && signupStep === "details" && (
+                {recoveryStep === "request" && (
+                  <Field
+                    icon={Mail}
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={setEmail}
+                    required
+                    disabled={busy}
+                  />
+                )}
+
+                {recoveryStep === "update" && (
+                  <PasswordStep
+                    password={password}
+                    confirmPassword={confirmPassword}
+                    showPassword={showPassword}
+                    showConfirmPassword={showConfirmPassword}
+                    setPassword={setPassword}
+                    setConfirmPassword={setConfirmPassword}
+                    setShowPassword={setShowPassword}
+                    setShowConfirmPassword={setShowConfirmPassword}
+                    passwordsMatch={passwordsMatch}
+                    disabled={busy}
+                  />
+                )}
+
+                {recoveryStep === "none" && mode === "signup" && signupStep === "details" && (
                   <>
                     <Field
                       icon={UserIcon}
@@ -550,7 +732,7 @@ function AuthPage() {
                   </>
                 )}
 
-                {mode === "signup" && signupStep === "otp" && (
+                {recoveryStep === "none" && mode === "signup" && signupStep === "otp" && (
                   <OtpStep
                     email={email}
                     otp={otp}
@@ -567,7 +749,7 @@ function AuthPage() {
                   />
                 )}
 
-                {mode === "signup" && signupStep === "password" && (
+                {recoveryStep === "none" && mode === "signup" && signupStep === "password" && (
                   <PasswordStep
                     password={password}
                     confirmPassword={confirmPassword}
@@ -582,7 +764,7 @@ function AuthPage() {
                   />
                 )}
 
-                {mode === "signin" && (
+                {recoveryStep === "none" && mode === "signin" && (
                   <>
                     <Field
                       icon={Mail}
@@ -603,6 +785,16 @@ function AuthPage() {
                       placeholder="Password"
                       disabled={busy}
                     />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={openRecoveryRequest}
+                        disabled={busy}
+                        className="text-xs font-semibold text-teal hover:underline disabled:opacity-50"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                   </>
                 )}
 
@@ -610,10 +802,14 @@ function AuthPage() {
                   type="submit"
                   disabled={
                     busy ||
-                    (mode === "signup" &&
+                    (recoveryStep === "update" &&
+                      (!passwordsMatch || password.length < 8)) ||
+                    (recoveryStep === "none" &&
+                      mode === "signup" &&
                       signupStep === "otp" &&
                       otp.length !== OTP_LENGTH) ||
-                    (mode === "signup" &&
+                    (recoveryStep === "none" &&
+                      mode === "signup" &&
                       signupStep === "password" &&
                       (!passwordsMatch || password.length < 8))
                   }
@@ -624,7 +820,7 @@ function AuthPage() {
                   ) : (
                     <ShieldCheck className="h-4 w-4" />
                   )}
-                  {submitLabel(mode, signupStep, formLoading)}
+                  {submitLabel(mode, signupStep, recoveryStep, formLoading)}
                 </button>
               </form>
 
@@ -885,26 +1081,48 @@ function PasswordField({
   );
 }
 
-function getHeading(mode: AuthMode, step: SignupStep) {
-  if (mode === "signin")
+function getHeading(
+  mode: AuthMode,
+  step: SignupStep,
+  recoveryStep: RecoveryStep,
+) {
+  if (recoveryStep === "request") {
+    return {
+      eyebrow: "Account recovery",
+      title: "Reset your password.",
+      description:
+        "Enter your email and we’ll send a secure password reset link if an account exists.",
+    };
+  }
+  if (recoveryStep === "update") {
+    return {
+      eyebrow: "Account recovery",
+      title: "Choose a new password.",
+      description: "Create a new password for your BraverTogether account.",
+    };
+  }
+  if (mode === "signin") {
     return {
       eyebrow: "Welcome back",
       title: "Sign in to continue.",
       description: "Access your messages, meetings and profile.",
     };
-  if (step === "otp")
+  }
+  if (step === "otp") {
     return {
       eyebrow: "Email verification",
       title: "Check your inbox.",
       description: "Enter the six-digit code to verify your email address.",
     };
-  if (step === "password")
+  }
+  if (step === "password") {
     return {
       eyebrow: "Set your password",
       title: "Finish your account.",
       description:
         "Create a secure password for your BraverTogether member account.",
     };
+  }
   return {
     eyebrow: "Create your member account",
     title: "Join BraverTogether.",
@@ -913,8 +1131,19 @@ function getHeading(mode: AuthMode, step: SignupStep) {
   };
 }
 
-function submitLabel(mode: AuthMode, step: SignupStep, loading: boolean) {
-  if (loading)
+function submitLabel(
+  mode: AuthMode,
+  step: SignupStep,
+  recoveryStep: RecoveryStep,
+  loading: boolean,
+) {
+  if (recoveryStep === "request") {
+    return loading ? "Sending reset link..." : "Send password reset link";
+  }
+  if (recoveryStep === "update") {
+    return loading ? "Updating password..." : "Update password";
+  }
+  if (loading) {
     return mode === "signin"
       ? "Signing in..."
       : step === "details"
@@ -922,6 +1151,7 @@ function submitLabel(mode: AuthMode, step: SignupStep, loading: boolean) {
         : step === "otp"
           ? "Verifying..."
           : "Creating account...";
+  }
   if (mode === "signin") return "Sign in";
   if (step === "details") return "Send verification code";
   if (step === "otp") return "Verify code";

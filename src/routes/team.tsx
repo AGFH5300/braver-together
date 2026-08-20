@@ -6,7 +6,7 @@ export const Route = createFileRoute("/team")({
   head: () => ({
     meta: [
       { title: "Meet the Team — BraverTogether" },
-      { name: "description", content: "The people building BraverTogether — leadership, media, events, outreach, and digital legal advisors." },
+      { name: "description", content: "The people building BraverTogether — leadership, technology, media, events, outreach, and digital legal advisors." },
       { property: "og:title", content: "Meet the Team — BraverTogether" },
       { property: "og:description", content: "The people behind BraverTogether." },
     ],
@@ -24,6 +24,12 @@ const groups: Group[] = [
       { name: "Tara Vishwakarthik", role: "Founder & Executive Director" },
       { name: "Izaan Mohammad", role: "Chief Management Officer & Co-Founder" },
       { name: "Katherine Raj Varghese", role: "Chief Operations Officer & Co-Founder" },
+    ],
+  },
+  {
+    title: "Technology",
+    members: [
+      { name: "Ansh Gupta", role: "Chief Technology Officer" },
     ],
   },
   {
@@ -86,7 +92,7 @@ function TeamPage() {
         <Section className="py-20 relative">
           <Eyebrow>The Team</Eyebrow>
           <h1 className="mt-4 text-5xl sm:text-6xl font-bold max-w-3xl text-navy-deep">Meet the people behind BraverTogether.</h1>
-          <p className="mt-4 max-w-2xl text-navy-deep/70">A student-led team building digital legal literacy for teens — across leadership, media, events, outreach, and advising.</p>
+          <p className="mt-4 max-w-2xl text-navy-deep/70">A student-led team building digital legal literacy for teens — across leadership, technology, media, events, outreach, and advising.</p>
         </Section>
       </div>
 
