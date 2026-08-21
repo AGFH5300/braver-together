@@ -42,6 +42,7 @@ type SignupDraft = {
   email: string;
   fullName: string;
   step: SignupStep;
+  verifiedUserId?: string;
 };
 
 const SIGNUP_DRAFT_KEY = "braver_together_signup";
@@ -66,20 +67,30 @@ function readSignupDraft(): SignupDraft | null {
   if (typeof window === "undefined") return null;
   const raw = window.sessionStorage.getItem(SIGNUP_DRAFT_KEY);
   if (!raw) return null;
+
   try {
     const parsed = JSON.parse(raw) as Partial<SignupDraft>;
+    const validStep =
+      parsed.step === "details" ||
+      parsed.step === "otp" ||
+      parsed.step === "password";
+    const validPasswordMarker =
+      parsed.step !== "password" ||
+      (typeof parsed.verifiedUserId === "string" && parsed.verifiedUserId.length > 0);
+
     if (
       typeof parsed.email === "string" &&
       typeof parsed.fullName === "string" &&
-      (parsed.step === "details" ||
-        parsed.step === "otp" ||
-        parsed.step === "password")
+      validStep &&
+      validPasswordMarker
     ) {
       return parsed as SignupDraft;
     }
   } catch {
-    window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+    // Clear malformed or outdated signup state below.
   }
+
+  window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
   return null;
 }
 
@@ -87,10 +98,15 @@ function saveSignupDraft(draft: SignupDraft) {
   window.sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
 }
 
+function clearSignupDraft() {
+  window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const getAccess = useServerFn(getAccountAccessState);
   const { mode: requestedMode, recovery: requestedRecovery } = Route.useSearch();
+
   const [mode, setMode] = useState<AuthMode>(requestedMode ?? "signup");
   const [signupStep, setSignupStep] = useState<SignupStep>("details");
   const [recoveryStep, setRecoveryStep] = useState<RecoveryStep>(
@@ -105,11 +121,9 @@ function AuthPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [resendSeconds, setResendSeconds] = useState(0);
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(true);
-  const googleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === "true";
 
   const continueAfterAuth = useCallback(async () => {
     const access = await getAccess();
@@ -141,10 +155,17 @@ function AuthPage() {
     if (!isRecoveryReturn && draft && initialMode !== "signin") {
       setEmail(draft.email);
       setFullName(draft.fullName);
-      setSignupStep(draft.step);
-      if (draft.step !== "details") setMode("signup");
-    } else if (!isRecoveryReturn && draft?.step !== "password" && initialMode === "signin") {
-      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+
+      // OTP can safely be restored. The password step is restored only after
+      // the current Supabase session is proven to match the verified user.
+      if (draft.step === "otp") {
+        setSignupStep("otp");
+        setMode("signup");
+      } else if (draft.step === "details") {
+        setSignupStep("details");
+      }
+    } else if (!isRecoveryReturn && initialMode === "signin") {
+      clearSignupDraft();
     }
 
     async function hydrate() {
@@ -152,7 +173,7 @@ function AuthPage() {
         if (isRecoveryReturn) {
           setMode("signin");
           setRecoveryStep("update");
-          window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+          clearSignupDraft();
 
           const { data, error } = await supabase.auth.getSession();
           if (cancelled) return;
@@ -168,29 +189,42 @@ function AuthPage() {
         const { data, error } = await supabase.auth.getUser();
         if (cancelled) return;
         if (error && !data.user) return;
+        if (!data.user) return;
 
-        const unfinishedSignup =
-          data.user?.user_metadata?.signup_completed === false;
-        if (data.user && (draft?.step === "password" || unfinishedSignup)) {
-          const recoveredName =
-            draft?.fullName ||
-            data.user.user_metadata?.full_name ||
-            data.user.user_metadata?.display_name ||
-            "";
-          setMode("signup");
-          setSignupStep("password");
-          setEmail(draft?.email || data.user.email || "");
-          setFullName(recoveredName);
-          if (data.user.email) {
-            saveSignupDraft({
-              email: data.user.email,
-              fullName: recoveredName,
-              step: "password",
-            });
-          }
-        } else if (data.user) {
-          void continueAfterAuth();
+        const signupCompleted = data.user.user_metadata?.signup_completed;
+        if (signupCompleted !== false) {
+          await continueAfterAuth();
+          return;
         }
+
+        const verifiedDraft =
+          draft?.step === "password" &&
+          draft.verifiedUserId === data.user.id &&
+          draft.email.toLowerCase() === (data.user.email ?? "").toLowerCase();
+
+        if (!verifiedDraft) {
+          // An unfinished/stale auth session is not proof that the OTP was
+          // verified in this signup flow. Never expose password creation from it.
+          await supabase.auth.signOut();
+          clearSignupDraft();
+          setMode(requestedMode ?? "signup");
+          setSignupStep("details");
+          setEmail("");
+          setFullName("");
+          setInlineMessage(null);
+          return;
+        }
+
+        const recoveredName =
+          draft.fullName ||
+          data.user.user_metadata?.full_name ||
+          data.user.user_metadata?.display_name ||
+          "";
+
+        setMode("signup");
+        setSignupStep("password");
+        setEmail(draft.email);
+        setFullName(recoveredName);
       } finally {
         if (!cancelled) setHydrating(false);
       }
@@ -198,15 +232,10 @@ function AuthPage() {
 
     void hydrate();
 
-    const resetTransientState = () => setGoogleLoading(false);
-    window.addEventListener("pageshow", resetTransientState);
-    document.addEventListener("visibilitychange", resetTransientState);
     return () => {
       cancelled = true;
-      window.removeEventListener("pageshow", resetTransientState);
-      document.removeEventListener("visibilitychange", resetTransientState);
     };
-  }, [continueAfterAuth, requestedRecovery]);
+  }, [continueAfterAuth, requestedMode, requestedRecovery]);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -236,7 +265,9 @@ function AuthPage() {
     setPassword("");
     setConfirmPassword("");
     setOtp("");
-    window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+    setAgreed(false);
+    clearSignupDraft();
+
     await navigate({
       to: "/auth",
       search: { mode: nextMode, recovery: undefined },
@@ -259,6 +290,7 @@ function AuthPage() {
     setPassword("");
     setConfirmPassword("");
     setInlineMessage(null);
+
     await navigate({
       to: "/auth",
       search: { mode: "signin", recovery: undefined },
@@ -266,36 +298,10 @@ function AuthPage() {
     });
   }
 
-  async function handleGoogle() {
-    if (!googleEnabled) {
-      setInlineMessage(
-        "Google sign-in is not available yet. Please use email and password.",
-      );
-      return;
-    }
-
-    setGoogleLoading(true);
-    setInlineMessage(null);
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth?mode=signin`,
-          skipBrowserRedirect: true,
-        },
-      });
-      if (error) throw error;
-      if (!data.url) throw new Error("Google sign-in could not be started.");
-      window.location.assign(data.url);
-    } catch (error) {
-      showError(error, "Google sign-in failed.");
-      setGoogleLoading(false);
-    }
-  }
-
   async function sendSignupOtp() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedName = fullName.trim();
+
     if (!normalizedName) {
       setInlineMessage("Please enter your full name.");
       return;
@@ -313,6 +319,7 @@ function AuthPage() {
 
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
@@ -327,6 +334,7 @@ function AuthPage() {
         },
       });
       if (error) throw error;
+
       setEmail(normalizedEmail);
       setFullName(normalizedName);
       setOtp("");
@@ -355,9 +363,11 @@ function AuthPage() {
 
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         token: otp,
         type: "email",
       });
@@ -368,7 +378,7 @@ function AuthPage() {
 
       if (data.user.user_metadata?.signup_completed !== false) {
         await supabase.auth.signOut();
-        window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+        clearSignupDraft();
         setMode("signin");
         setSignupStep("details");
         setOtp("");
@@ -384,8 +394,20 @@ function AuthPage() {
         return;
       }
 
+      const verifiedName =
+        fullName.trim() ||
+        data.user.user_metadata?.full_name ||
+        data.user.user_metadata?.display_name ||
+        "";
+
+      setFullName(verifiedName);
       setSignupStep("password");
-      saveSignupDraft({ email, fullName, step: "password" });
+      saveSignupDraft({
+        email: normalizedEmail,
+        fullName: verifiedName,
+        step: "password",
+        verifiedUserId: data.user.id,
+      });
       setInlineMessage(
         "Email verified. Create your password to finish setting up your member account.",
       );
@@ -398,22 +420,25 @@ function AuthPage() {
 
   async function resendSignupOtp() {
     if (resendSeconds > 0 || formLoading) return;
+
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim().toLowerCase(),
         options: {
           shouldCreateUser: true,
           emailRedirectTo: `${window.location.origin}/auth?mode=signup`,
           data: {
-            display_name: fullName,
-            full_name: fullName,
+            display_name: fullName.trim(),
+            full_name: fullName.trim(),
             signup_completed: false,
           },
         },
       });
       if (error) throw error;
+
       setResendSeconds(RESEND_DELAY_SECONDS);
       setInlineMessage(
         `A new ${OTP_LENGTH}-digit code has been sent to ${email}.`,
@@ -437,7 +462,30 @@ function AuthPage() {
 
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
+      const draft = readSignupDraft();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const sessionUser = sessionData.session?.user;
+
+      if (
+        sessionError ||
+        !sessionUser ||
+        draft?.step !== "password" ||
+        !draft.verifiedUserId ||
+        draft.verifiedUserId !== sessionUser.id ||
+        sessionUser.user_metadata?.signup_completed !== false
+      ) {
+        await supabase.auth.signOut();
+        clearSignupDraft();
+        setSignupStep("details");
+        setPassword("");
+        setConfirmPassword("");
+        throw new Error(
+          "Your verified signup session is no longer valid. Please verify your email again.",
+        );
+      }
+
       const { data, error } = await supabase.auth.updateUser({
         password,
         data: {
@@ -455,7 +503,7 @@ function AuthPage() {
         .eq("id", data.user.id);
       if (profileError) throw profileError;
 
-      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+      clearSignupDraft();
       toast.success("Member account created");
       await continueAfterAuth();
     } catch (error) {
@@ -466,14 +514,29 @@ function AuthPage() {
   }
 
   async function signIn() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      setInlineMessage("Enter your email address and password.");
+      return;
+    }
+
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
         password,
       });
       if (error) throw error;
+
+      if (data.user?.user_metadata?.signup_completed === false) {
+        await supabase.auth.signOut();
+        throw new Error(
+          "This account setup is incomplete. Use Create account to verify your email and finish registration.",
+        );
+      }
+
       toast.success("Signed in");
       await continueAfterAuth();
     } catch (error) {
@@ -492,6 +555,7 @@ function AuthPage() {
 
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/auth?mode=signin&recovery=1`,
@@ -520,6 +584,7 @@ function AuthPage() {
 
     setFormLoading(true);
     setInlineMessage(null);
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session?.user) {
@@ -559,7 +624,7 @@ function AuthPage() {
     toast.error(message);
   }
 
-  const busy = formLoading || googleLoading || hydrating;
+  const busy = formLoading || hydrating;
   const passwordsMatch =
     confirmPassword.length > 0 && password === confirmPassword;
   const heading = getHeading(mode, signupStep, recoveryStep);
@@ -618,30 +683,6 @@ function AuthPage() {
                 </button>
               )}
 
-              {recoveryStep === "none" && signupStep === "details" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleGoogle}
-                    disabled={busy || !googleEnabled}
-                    className="mt-5 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-navy/15 bg-white px-4 py-3 text-sm font-semibold text-navy-deep transition hover:border-teal/50 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    {googleLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <GoogleIcon />
-                    )}
-                    {googleEnabled
-                      ? "Continue with Google"
-                      : "Google sign-in coming soon"}
-                  </button>
-                  <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-                    <div className="h-px flex-1 bg-border" /> or use email{" "}
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
-                </>
-              )}
-
               {recoveryStep === "none" && signupStep === "otp" && (
                 <SignupProgress current={2} />
               )}
@@ -659,7 +700,7 @@ function AuthPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3">
+              <form onSubmit={handleSubmit} className="mt-5 space-y-3">
                 {recoveryStep === "request" && (
                   <Field
                     icon={Mail}
@@ -902,9 +943,9 @@ function OtpStep({
           {resendSeconds > 0 ? `Resend in ${resendSeconds}s` : "Resend code"}
         </button>
       </div>
+
       <p className="text-center text-xs text-muted-foreground">
-        Code sent to{" "}
-        <span className="font-semibold text-foreground">{email}</span>
+        Code sent to <span className="font-semibold text-foreground">{email}</span>
       </p>
     </div>
   );
@@ -1164,28 +1205,5 @@ function tabClass(active: boolean) {
     active
       ? "bg-card text-foreground shadow-sm"
       : "text-muted-foreground hover:text-foreground",
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.57c2.09-1.93 3.27-4.76 3.27-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.76c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.28-1.93-6.14-4.53H2.18v2.84A11 11 0 0 0 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.86 14.11A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.36-2.11V7.05H2.18A11 11 0 0 0 1 12c0 1.78.43 3.46 1.18 4.95l3.68-2.84z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.07.56 4.21 1.64l3.15-3.15C17.46 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.68 2.84C6.72 7.31 9.14 5.38 12 5.38z"
-      />
-    </svg>
   );
 }
