@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
+  ChevronDown,
   Heart,
   Inbox,
   LogIn,
@@ -13,14 +14,14 @@ import {
   UserRoundPlus,
   X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
 
+import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 import {
   clearAccountAccessCache,
   useAccountAccess,
 } from "@/hooks/use-account-access";
 import { cn } from "@/lib/utils";
-import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -50,7 +51,7 @@ function AccountLink({
 }: {
   to: "/messages" | "/meetings" | "/profile" | "/admin-advisors" | "/admin-competitions";
   label: string;
-  icon: React.ElementType;
+  icon: ElementType;
   messageView?: "queue";
   onNavigate?: () => void;
 }) {
@@ -215,13 +216,127 @@ function AuthControls({
   );
 }
 
+function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
+  const { user, loading, account, signOut } = access;
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  async function handleSignOut() {
+    if (user) clearAccountAccessCache(user.id);
+    setMenuOpen(false);
+    await signOut();
+    await navigate({ to: "/" });
+  }
+
+  if (loading) {
+    return <div className="hidden h-9 w-24 animate-pulse rounded-full bg-secondary xl:block" aria-hidden="true" />;
+  }
+
+  if (!user) {
+    return (
+      <div className="hidden shrink-0 items-center gap-2 xl:flex">
+        <Link
+          to="/advisors"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-teal/30 bg-teal/5 px-3 py-2 text-xs font-semibold text-teal transition hover:bg-teal/10"
+        >
+          <MessageCircle className="h-3.5 w-3.5" /> Ask an Advisor
+        </Link>
+        <Link
+          to="/auth"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-navy px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+        >
+          <LogIn className="h-3.5 w-3.5" /> Join or sign in
+        </Link>
+      </div>
+    );
+  }
+
+  const role = account?.role;
+  const roleLabel = role === "administrator"
+    ? "Administrator"
+    : role === "advisor"
+      ? "Advisor"
+      : role === "restricted"
+        ? "Access review"
+        : "Member";
+  const roleClass = role === "administrator"
+    ? "bg-navy text-white"
+    : role === "advisor"
+      ? "bg-teal/10 text-teal"
+      : role === "restricted"
+        ? "bg-warn/10 text-warn"
+        : "bg-secondary text-navy-deep";
+  const applicationLabel = account?.applicationStatus === "pending"
+    ? "Advisor application status"
+    : account?.applicationStatus === "more_info"
+      ? "Update advisor application"
+      : account?.applicationStatus === "denied"
+        ? "Review advisor application"
+        : account?.isApplicant
+          ? "Continue advisor application"
+          : "Apply as an Advisor";
+  const itemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-foreground transition hover:bg-secondary";
+  const close = () => setMenuOpen(false);
+
+  return (
+    <div className="relative hidden shrink-0 items-center gap-2 xl:flex">
+      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold", roleClass)}>
+        <ShieldCheck className="h-3.5 w-3.5" /> {roleLabel}
+      </span>
+      <button
+        type="button"
+        onClick={() => setMenuOpen((current) => !current)}
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold text-navy-deep transition hover:border-teal/40 hover:bg-secondary"
+      >
+        <UserIcon className="h-3.5 w-3.5" /> Account <ChevronDown className={cn("h-3.5 w-3.5 transition", menuOpen && "rotate-180")} />
+      </button>
+
+      {menuOpen && (
+        <div role="menu" className="absolute right-0 top-full z-[70] mt-2 w-64 rounded-2xl border border-border bg-card p-2 shadow-xl">
+          {role === "administrator" ? (
+            <>
+              <Link to="/admin-advisors" onClick={close} className={itemClass}><UserRoundPlus className="h-4 w-4 text-teal" /> Advisor Applications</Link>
+              <Link to="/admin-competitions" onClick={close} className={itemClass}><Trophy className="h-4 w-4 text-teal" /> Competition Admin</Link>
+              <Link to="/profile" onClick={close} className={itemClass}><UserIcon className="h-4 w-4 text-teal" /> My Profile</Link>
+            </>
+          ) : role === "advisor" ? (
+            <>
+              <Link to="/messages" search={{ c: undefined, view: undefined }} onClick={close} className={itemClass}><MessageCircle className="h-4 w-4 text-teal" /> Advisor Inbox</Link>
+              <Link to="/messages" search={{ c: undefined, view: "queue" }} onClick={close} className={itemClass}><Inbox className="h-4 w-4 text-teal" /> Open Request Queue</Link>
+              <Link to="/meetings" onClick={close} className={itemClass}><CalendarDays className="h-4 w-4 text-teal" /> Advisor Meetings</Link>
+              <Link to="/profile" onClick={close} className={itemClass}><UserIcon className="h-4 w-4 text-teal" /> Advisor Profile</Link>
+            </>
+          ) : role === "restricted" ? (
+            <Link to="/profile" onClick={close} className={itemClass}><UserIcon className="h-4 w-4 text-warn" /> My Profile</Link>
+          ) : (
+            <>
+              <Link to="/advisors" onClick={close} className={itemClass}><MessageCircle className="h-4 w-4 text-teal" /> Ask an Advisor</Link>
+              <Link to="/messages" search={{ c: undefined, view: undefined }} onClick={close} className={itemClass}><MessageCircle className="h-4 w-4 text-teal" /> My Support Requests</Link>
+              <Link to="/meetings" onClick={close} className={itemClass}><CalendarDays className="h-4 w-4 text-teal" /> My Meetings</Link>
+              <Link to="/advisor-application" onClick={close} className={itemClass}><UserRoundPlus className="h-4 w-4 text-teal" /> {applicationLabel}</Link>
+              <Link to="/profile" onClick={close} className={itemClass}><UserIcon className="h-4 w-4 text-teal" /> My Profile</Link>
+            </>
+          )}
+          <div className="my-1 border-t border-border" />
+          <button type="button" onClick={handleSignOut} className={cn(itemClass, "text-muted-foreground")}>
+            <LogOut className="h-4 w-4" /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SiteLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const access = useAccountAccess();
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-16 max-w-[1800px] items-center justify-between gap-4 px-4 py-2 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-[1800px] items-center gap-3 px-4 py-2 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-2.5">
             <BrandMark />
             <div className="flex flex-col leading-none">
@@ -229,6 +344,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Digital Legal Literacy</span>
             </div>
           </Link>
+
           <nav className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 xl:flex">
             {nav.map((item) => (
               <Link key={item.to} to={item.to} className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground" activeProps={{ className: "text-foreground bg-secondary" }} activeOptions={{ exact: item.to === "/" }}>
@@ -237,15 +353,14 @@ export function SiteLayout({ children }: { children: ReactNode }) {
             ))}
             <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">Contract Decoder</Link>
           </nav>
-          <button onClick={() => setOpen(!open)} className="rounded-md p-2 hover:bg-secondary xl:hidden" aria-label={open ? "Close menu" : "Open menu"}>
+
+          <DesktopAccountControls access={access} />
+
+          <button onClick={() => setOpen(!open)} className="ml-auto rounded-md p-2 hover:bg-secondary xl:hidden" aria-label={open ? "Close menu" : "Open menu"}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-        <div className="hidden border-t border-border/60 xl:block">
-          <div className="mx-auto flex max-w-[1800px] justify-end px-4 py-2 sm:px-6">
-            <AuthControls access={access} />
-          </div>
-        </div>
+
         {open && (
           <div className="border-t border-border bg-background xl:hidden">
             <div className="flex flex-col gap-1 px-4 py-3">
@@ -261,10 +376,15 @@ export function SiteLayout({ children }: { children: ReactNode }) {
           </div>
         )}
       </header>
+
       <main className="flex-1">{children}</main>
+
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
-          <div><div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div><p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p></div>
+          <div>
+            <div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div>
+            <p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p>
+          </div>
           <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><FooterLinks access={access} /></div>
           <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4><p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p></div>
         </div>
@@ -328,6 +448,7 @@ function FooterLinks({ access }: { access: AccountAccessHook }) {
     : account?.isApplicant
       ? "Continue advisor application"
       : "Apply to be an Advisor";
+
   return (
     <ul className="space-y-2 text-sm text-white/70">
       {publicLinks}
