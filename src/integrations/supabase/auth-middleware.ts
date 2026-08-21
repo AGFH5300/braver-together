@@ -1,6 +1,7 @@
+import { createClient } from "@supabase/supabase-js";
 import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { createClient } from "@supabase/supabase-js";
+
 import type { Database } from "./types";
 
 function isNewSupabaseApiKey(value: string): boolean {
@@ -76,20 +77,30 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       },
     });
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (
-      error ||
-      !data?.claims?.sub ||
-      data.claims.user_metadata?.signup_completed === false
-    ) {
+    // Validate the JWT itself first. Do not use mutable user_metadata from these
+    // claims for account-state decisions: immediately after updateUser(), the
+    // access token can legitimately contain the previous metadata until refresh.
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
       throw new Error("Unauthorized: Invalid token");
+    }
+
+    // Read the current user record from Supabase Auth so signup_completed reflects
+    // the latest server-side metadata rather than a stale value embedded in the JWT.
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData.user || userData.user.id !== claimsData.claims.sub) {
+      throw new Error("Unauthorized: Invalid token");
+    }
+
+    if (userData.user.user_metadata?.signup_completed === false) {
+      throw new Error("Unauthorized: Account setup is incomplete");
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId: userData.user.id,
+        claims: claimsData.claims,
       },
     });
   },
