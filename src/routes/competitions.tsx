@@ -87,7 +87,7 @@ function Competitions() {
           <div className="mt-8 grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Detail icon={Users} label="Eligibility" value="Ages 12–18" />
             <Detail icon={FileText} label="Essay length" value="800–1,200 words" />
-            <Detail icon={Calendar} label="Deadline" value="August 20, 2026 · 11:59 PM local time" />
+            <Detail icon={Calendar} label="Deadline" value="August 30, 2026 · 11:59 PM local time" />
             <Detail icon={Trophy} label="Top prize" value="918.12 AED · approx. $250 USD" />
           </div>
         </Section>
@@ -225,7 +225,7 @@ function Competitions() {
             <Eyebrow>Key dates</Eyebrow>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               <DateCard label="Competition opens" value="July 31, 2026" />
-              <DateCard label="Submission deadline" value="August 20, 2026 · 11:59 PM local time" />
+              <DateCard label="Submission deadline" value="August 30, 2026 · 11:59 PM local time" />
               <DateCard label="Winners announced" value="By August 30, 2026" />
             </div>
 
