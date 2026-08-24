@@ -97,7 +97,7 @@ export function CountrySelect({
   }
 
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1.5 block text-sm font-semibold">Country or territory</span>
       <div ref={rootRef} className="relative">
         <button
@@ -156,7 +156,7 @@ export function CountrySelect({
                       onClick={() => selectCountry(country)}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-secondary",
-                        active && "bg-teal/8 font-semibold text-navy-deep",
+                        active && "bg-teal/10 font-semibold text-navy-deep",
                       )}
                     >
                       <img
@@ -177,6 +177,6 @@ export function CountrySelect({
           </div>
         )}
       </div>
-    </label>
+    </div>
   );
 }
