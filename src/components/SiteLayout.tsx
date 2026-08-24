@@ -14,7 +14,7 @@ import {
   UserRoundPlus,
   X,
 } from "lucide-react";
-import { useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 
 import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 import {
@@ -219,7 +219,26 @@ function AuthControls({
 function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
   const { user, loading, account, signOut } = access;
   const navigate = useNavigate();
+  const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   async function handleSignOut() {
     if (user) clearAccountAccessCache(user.id);
@@ -279,10 +298,7 @@ function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
   const close = () => setMenuOpen(false);
 
   return (
-    <div className="relative hidden shrink-0 items-center gap-2 xl:flex">
-      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold", roleClass)}>
-        <ShieldCheck className="h-3.5 w-3.5" /> {roleLabel}
-      </span>
+    <div ref={menuRef} className="relative hidden shrink-0 items-center xl:flex">
       <button
         type="button"
         onClick={() => setMenuOpen((current) => !current)}
@@ -290,11 +306,19 @@ function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
         aria-haspopup="menu"
         className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold text-navy-deep transition hover:border-teal/40 hover:bg-secondary"
       >
-        <UserIcon className="h-3.5 w-3.5" /> Account <ChevronDown className={cn("h-3.5 w-3.5 transition", menuOpen && "rotate-180")} />
+        <UserIcon className="h-3.5 w-3.5" /> Account
+        <ChevronDown className={cn("h-3.5 w-3.5 transition", menuOpen && "rotate-180")} />
       </button>
 
       {menuOpen && (
         <div role="menu" className="absolute right-0 top-full z-[70] mt-2 w-64 rounded-2xl border border-border bg-card p-2 shadow-xl">
+          <div className="mb-1 flex items-center justify-between gap-3 rounded-xl bg-secondary/45 px-3 py-2.5">
+            <span className="text-xs font-medium text-muted-foreground">Signed in as</span>
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold", roleClass)}>
+              <ShieldCheck className="h-3 w-3" /> {roleLabel}
+            </span>
+          </div>
+
           {role === "administrator" ? (
             <>
               <Link to="/admin-advisors" onClick={close} className={itemClass}><UserRoundPlus className="h-4 w-4 text-teal" /> Advisor Applications</Link>
@@ -347,11 +371,19 @@ export function SiteLayout({ children }: { children: ReactNode }) {
 
           <nav className="hidden min-w-0 flex-1 items-center justify-end gap-0.5 xl:flex">
             {nav.map((item) => (
-              <Link key={item.to} to={item.to} className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground" activeProps={{ className: "text-foreground bg-secondary" }} activeOptions={{ exact: item.to === "/" }}>
+              <Link
+                key={item.to}
+                to={item.to}
+                className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                activeProps={{ className: "text-foreground bg-secondary" }}
+                activeOptions={{ exact: item.to === "/" }}
+              >
                 {item.label}
               </Link>
             ))}
-            <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">Contract Decoder</Link>
+            <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">
+              Contract Decoder
+            </Link>
           </nav>
 
           <DesktopAccountControls access={access} />
@@ -365,9 +397,13 @@ export function SiteLayout({ children }: { children: ReactNode }) {
           <div className="border-t border-border bg-background xl:hidden">
             <div className="flex flex-col gap-1 px-4 py-3">
               {nav.map((item) => (
-                <Link key={item.to} to={item.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary">{item.label}</Link>
+                <Link key={item.to} to={item.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-secondary">
+                  {item.label}
+                </Link>
               ))}
-              <Link to="/decoder" onClick={() => setOpen(false)} className="mt-2 inline-flex items-center justify-center rounded-full bg-mesh px-4 py-2.5 text-sm font-semibold text-white">Contract Decoder</Link>
+              <Link to="/decoder" onClick={() => setOpen(false)} className="mt-2 inline-flex items-center justify-center rounded-full bg-mesh px-4 py-2.5 text-sm font-semibold text-white">
+                Contract Decoder
+              </Link>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                 <span className="text-xs text-muted-foreground">Account</span>
                 <AuthControls access={access} onNavigate={() => setOpen(false)} />
@@ -382,11 +418,20 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           <div>
-            <div className="mb-3 flex items-center gap-2"><BrandMark /><span className="font-display text-lg font-bold">BraverTogether</span></div>
+            <div className="mb-3 flex items-center gap-2">
+              <BrandMark />
+              <span className="font-display text-lg font-bold">BraverTogether</span>
+            </div>
             <p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p>
           </div>
-          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4><FooterLinks access={access} /></div>
-          <div><h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4><p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p></div>
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4>
+            <FooterLinks access={access} />
+          </div>
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4>
+            <p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p>
+          </div>
         </div>
         <div className="border-t border-white/10 py-4 text-center text-xs text-white/55">© {new Date().getFullYear()} BraverTogether · Digital Legal Literacy Initiative</div>
       </footer>
@@ -464,5 +509,10 @@ export function Section({ children, className }: { children: ReactNode; classNam
 }
 
 export function Eyebrow({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-teal/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal" />{children}</span>;
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-teal/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal" />
+      {children}
+    </span>
+  );
 }
