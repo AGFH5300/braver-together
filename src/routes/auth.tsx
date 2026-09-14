@@ -52,7 +52,7 @@ const RESEND_DELAY_SECONDS = 60;
 export const Route = createFileRoute("/auth")({
   validateSearch: (search) => AuthSearch.parse(search),
   head: () => ({
-    meta: [
+    meta: [{ name: "robots", content: "noindex,nofollow" },
       { title: "Sign in — BraverTogether" },
       {
         name: "description",
@@ -761,7 +761,7 @@ function AuthPage() {
                       <span>
                         I agree to the{" "}
                         <Link
-                          to="/advisors"
+                          to="/community-guidelines"
                           className="font-semibold text-teal underline underline-offset-2"
                         >
                           community rules

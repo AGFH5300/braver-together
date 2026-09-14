@@ -5,7 +5,7 @@ export const Route = createFileRoute("/advisor-signup")({
     throw redirect({ to: "/auth" });
   },
   head: () => ({
-    meta: [
+    meta: [{ name: "robots", content: "noindex,nofollow" },
       { title: "Apply to Be an Advisor — BraverTogether" },
       {
         name: "description",

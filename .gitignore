@@ -12,3 +12,6 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+/supabase/.temp/
+/check-output.log

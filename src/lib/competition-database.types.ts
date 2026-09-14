@@ -8,13 +8,17 @@ type Table<Row, Insert, Update> = {
 };
 
 type CompetitionRow = {
+  category: string;
+  prompts: string[];
+  public_rules: string;
+  results_at: string | null;
   closes_at: string | null;
   created_at: string;
   id: string;
   is_public: boolean;
   maximum_age: number;
   maximum_words: number | null;
-  minimum_age: number;
+  minimum_age: number | null;
   minimum_words: number | null;
   opens_at: string | null;
   prize_text: string | null;
@@ -115,7 +119,11 @@ type AdvisorOnboardingIntentInsert = {
   user_id: string;
 };
 
+type DirectoryRow = { id: string; linked_user_id: string | null; display_name: string; headline: string | null; bio: string | null; photo_url: string | null; sort_order: number; is_public: boolean; created_at: string; updated_at: string };
+type ReportRow = Database["public"]["Tables"]["reports"]["Row"] & { status: string; resolution_note: string | null; reviewed_at: string | null; reviewed_by: string | null };
 type AdditionalTables = {
+  public_advisors: Table<DirectoryRow, Partial<DirectoryRow> & Pick<DirectoryRow, "display_name">, Partial<DirectoryRow>>;
+  reports: Table<ReportRow, Partial<ReportRow> & Pick<ReportRow, "conversation_id" | "reporter_id" | "reason">, Partial<ReportRow>>;
   competitions: Table<
     CompetitionRow,
     Partial<Omit<CompetitionRow, "slug" | "title">> & Pick<CompetitionRow, "slug" | "title">,
@@ -147,7 +155,7 @@ type AdditionalTables = {
 
 type BaseTables = Omit<
   Database["public"]["Tables"],
-  "advisor_applications" | "competitions" | "essay_submissions" | "essay_submission_events"
+  "advisor_applications" | "competitions" | "essay_submissions" | "essay_submission_events" | "reports"
 >;
 
 export type CompetitionDatabase = {
@@ -155,7 +163,7 @@ export type CompetitionDatabase = {
   public: {
     Tables: BaseTables & AdditionalTables;
     Views: Database["public"]["Views"];
-    Functions: Database["public"]["Functions"];
+    Functions: Database["public"]["Functions"] & { create_support_request: { Args: {p_user_id:string;p_subject:string;p_topic:string;p_body:string;p_advisor_id:string|null;p_allow_ai:boolean};Returns:string }; consume_ai_allowance: { Args: { p_feature: string; p_actor_key: string; p_limit: number }; Returns: number } };
     Enums: Database["public"]["Enums"];
     CompositeTypes: Database["public"]["CompositeTypes"];
   };

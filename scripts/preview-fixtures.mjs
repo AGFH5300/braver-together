@@ -1,0 +1,9 @@
+// Isolated read-only public-page fixtures. Never point this at a hosted database.
+import {PGlite} from '@electric-sql/pglite';
+import {createServer} from 'node:http';
+import {readFile,readdir} from 'node:fs/promises';
+const db=new PGlite();
+await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE SCHEMA auth; CREATE SCHEMA storage; CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,raw_user_meta_data jsonb DEFAULT '{}',created_at timestamptz DEFAULT now()); CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT NULL::uuid $$; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); CREATE PUBLICATION supabase_realtime;`);
+for(const f of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+const allowed=new Set(['competitions','public_advisors','profiles','resource_categories','resource_videos']);
+createServer(async(req,res)=>{const url=new URL(req.url,'http://127.0.0.1');const table=url.pathname.split('/').pop();res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Content-Type','application/json');if(req.method!=='GET'||!allowed.has(table)){res.writeHead(404);res.end('{}');return;}const {rows}=await db.query(`SELECT * FROM public.${table}`);let result=rows;for(const [key,val] of url.searchParams){if(val.startsWith('eq.'))result=result.filter(r=>String(r[key])===val.slice(3));if(val.startsWith('neq.'))result=result.filter(r=>String(r[key])!==val.slice(4));}res.end(JSON.stringify(req.headers.accept?.includes('vnd.pgrst.object')?result[0]??null:result));}).listen(54321,'127.0.0.1',()=>console.log('Read-only isolated public fixtures on 127.0.0.1:54321. No real accounts or hosted data.'));

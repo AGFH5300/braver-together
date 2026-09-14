@@ -4,6 +4,7 @@ import { Target, Sparkles, GitBranch } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
+    links: [{ rel: "canonical", href: "https://bravertogether.site/about" }],
     meta: [
       { title: "About — BraverTogether" },
       { name: "description", content: "About Tara Vishwakarthik and the mission behind the Digital Legal Literacy Initiative." },

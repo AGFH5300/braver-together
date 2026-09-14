@@ -14,7 +14,7 @@ export function createAiProvider({
   return createOpenAICompatible({
     name: "braver-together-ai",
     apiKey,
-    baseURL: baseUrl || "https://api.openai.com/v1",
+    baseURL: baseUrl || "https://api.groq.com/openai/v1",
     supportsStructuredOutputs,
   });
 }

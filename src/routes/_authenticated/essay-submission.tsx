@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/essay-submission")({
+  validateSearch: (s: Record<string, unknown>) => ({ competition: typeof s.competition === "string" ? s.competition : undefined }),
   component: EssaySubmissionPage,
 });
 
@@ -41,7 +42,7 @@ type Competition = {
   status: string;
   opens_at: string | null;
   closes_at: string | null;
-  minimum_age: number;
+  minimum_age: number | null;
   maximum_age: number;
   minimum_words: number | null;
   maximum_words: number | null;
@@ -147,6 +148,7 @@ function toForm(state: PortalState): FormState {
 }
 
 function EssaySubmissionPage() {
+  const { competition } = Route.useSearch();
   const getState = useServerFn(getEssayPortalState);
   const prepareUpload = useServerFn(prepareEssayUpload);
   const finalizeUpload = useServerFn(finalizeEssayUpload);
@@ -166,12 +168,12 @@ function EssaySubmissionPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [competition]);
 
   async function load() {
     setLoading(true);
     try {
-      const result = await getState();
+      const result = await getState({ data: { slug: competition } });
       const next = result as PortalState;
       setState(next);
       setForm(toForm(next));
@@ -391,7 +393,7 @@ function EssaySubmissionPage() {
                 <Field
                   label="Age"
                   type="number"
-                  min={state.competition.minimum_age}
+                  min={state.competition.minimum_age ?? 0}
                   max={state.competition.maximum_age}
                   value={form.participantAge}
                   onChange={(value) => setForm((current) => ({ ...current, participantAge: value }))}
@@ -421,7 +423,7 @@ function EssaySubmissionPage() {
                 <Field
                   label="Word count"
                   type="number"
-                  min={state.competition.minimum_words ?? 1}
+                  min={state.competition.minimum_words ?? 0}
                   max={state.competition.maximum_words ?? 50_000}
                   value={form.declaredWordCount}
                   onChange={(value) => setForm((current) => ({ ...current, declaredWordCount: value }))}
@@ -564,7 +566,7 @@ function CompetitionStatus({ competition }: { competition: Competition }) {
         </span>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Age" value={`${competition.minimum_age}–${competition.maximum_age}`} />
+        <Stat label="Age" value={competition.minimum_age === null ? `${competition.maximum_age} and under` : `${competition.minimum_age}–${competition.maximum_age}`} />
         <Stat label="Word count" value={wordRange(competition.minimum_words, competition.maximum_words)} />
         <Stat label="Opens" value={competition.opens_at ? new Date(competition.opens_at).toLocaleString() : "To be announced"} />
         <Stat label="Closes" value={competition.closes_at ? new Date(competition.closes_at).toLocaleString() : "To be announced"} />

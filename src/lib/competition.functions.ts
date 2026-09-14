@@ -1,3 +1,5 @@
+import { competitionIsOpen, validateEligibility } from "@/lib/competition-rules";
+import { validateDocument } from "@/lib/document-validation";
 import { createHash, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -5,7 +7,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAccountAccessState } from "@/lib/account-access.functions";
 
-export const CURRENT_COMPETITION_SLUG = "inaugural-digital-rights-essay";
+const SelectionInput = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(120).optional() });
 export const ESSAY_BUCKET = "essay-submissions";
 export const MAX_ESSAY_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -19,11 +21,11 @@ const allowedFileTypes = new Map([
 const SubmissionMetadataInput = z.object({
   competitionId: z.string().uuid(),
   participantName: z.string().trim().min(2).max(100),
-  participantAge: z.number().int().min(1).max(120),
+  participantAge: z.number().int().min(0).max(120),
   country: z.string().trim().min(2).max(100),
   schoolName: z.string().trim().max(160).optional().default(""),
   essayTitle: z.string().trim().min(5).max(180),
-  declaredWordCount: z.number().int().min(1).max(50_000),
+  declaredWordCount: z.number().int().min(0).max(50_000),
   originalFilename: z.string().trim().min(1).max(255),
   mimeType: z.enum([PDF_MIME, DOCX_MIME]),
   fileSize: z.number().int().positive().max(MAX_ESSAY_FILE_BYTES),
@@ -46,7 +48,12 @@ const CompetitionUpdateInput = z.object({
   status: z.enum(["draft", "open", "closed", "judging", "published"]),
   opensAt: z.string().trim().max(50).optional().default(""),
   closesAt: z.string().trim().max(50).optional().default(""),
-  minimumAge: z.number().int().min(1).max(120),
+  minimumAge: z.number().int().min(0).max(120).nullable(),
+  category: z.enum(["essay", "public-speaking"]),
+  isPublic: z.boolean(),
+  prompts: z.array(z.string().trim().min(10).max(3000)).max(20),
+  publicRules: z.string().trim().max(10000),
+  resultsAt: z.string().trim().max(50).optional().default(""),
   maximumAge: z.number().int().min(1).max(120),
   minimumWords: z.number().int().positive().max(50_000).nullable(),
   maximumWords: z.number().int().positive().max(50_000).nullable(),
@@ -88,26 +95,7 @@ function validateFileMetadata(filename: string, mimeType: string, size: number) 
   }
 }
 
-function validateMagicBytes(bytes: Uint8Array, mimeType: string) {
-  if (mimeType === PDF_MIME) {
-    const header = new TextDecoder().decode(bytes.slice(0, 5));
-    if (header !== "%PDF-") throw new Error("The uploaded file does not contain a valid PDF header.");
-    return;
-  }
 
-  const zipHeader = Array.from(bytes.slice(0, 4)).join(",");
-  const validZipHeaders = new Set(["80,75,3,4", "80,75,5,6", "80,75,7,8"]);
-  if (!validZipHeaders.has(zipHeader)) {
-    throw new Error("The uploaded file does not contain a valid DOCX/ZIP header.");
-  }
-}
-
-function competitionIsOpen(competition: { status: string; opens_at: string | null; closes_at: string | null }) {
-  const now = Date.now();
-  return competition.status === "open"
-    && (!competition.opens_at || Date.parse(competition.opens_at) <= now)
-    && (!competition.closes_at || Date.parse(competition.closes_at) > now);
-}
 
 async function roleState(userId: string) {
   const access = await loadAccountAccessState(userId);
@@ -134,29 +122,37 @@ async function requireAdmin(userId: string) {
   return state.supabaseAdmin;
 }
 
-async function currentCompetition() {
+async function selectedCompetition(slug?: string, includeDraft = false) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("competitions")
-    .select("id, slug, title, summary, status, opens_at, closes_at, minimum_age, maximum_age, minimum_words, maximum_words, prize_text, rules_url, is_public, updated_at")
-    .eq("slug", CURRENT_COMPETITION_SLUG)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("The essay competition has not been configured yet.");
+  let query = supabaseAdmin.from("competitions").select("*");
+  if (!includeDraft) query = query.eq("is_public", true).neq("status", "draft");
+  if (slug) query = query.eq("slug", slug);
+  const { data, error } = await query.order("opens_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+  if (error) throw new Error("Competitions could not be loaded. Please try again.");
+  if (!data) throw new Error("Competition not found.");
   return data;
 }
 
-export const getPublicCompetition = createServerFn({ method: "GET" }).handler(async () => {
-  const competition = await currentCompetition();
-  return { ...competition, acceptingSubmissions: competitionIsOpen(competition) };
+export const listPublicCompetitions = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.from("competitions").select("*").eq("is_public", true).neq("status", "draft").order("opens_at", { ascending: false });
+  if (error) throw new Error("Competitions could not be loaded. Please try again.");
+  return (data ?? []).map(c => ({ ...c, acceptingSubmissions: competitionIsOpen(c) }));
 });
+export const getPublicCompetition = createServerFn({ method: "GET" })
+  .validator((value: unknown) => SelectionInput.parse(value))
+  .handler(async ({ data }) => {
+    const competition = await selectedCompetition(data.slug);
+    return { ...competition, acceptingSubmissions: competitionIsOpen(competition) };
+  });
 
 export const getEssayPortalState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .validator((value: unknown) => SelectionInput.parse(value))
+  .handler(async ({ context, data }) => {
     const [{ supabaseAdmin, isAdmin, isAdvisor, isStudent }, competition] = await Promise.all([
       roleState(context.userId),
-      currentCompetition(),
+      selectedCompetition(data.slug),
     ]);
 
     const [{ data: profile }, { data: submission, error: submissionError }] = await Promise.all([
@@ -190,25 +186,18 @@ export const prepareEssayUpload = createServerFn({ method: "POST" })
 
     const { data: competition, error: competitionError } = await supabaseAdmin
       .from("competitions")
-      .select("id, status, opens_at, closes_at, minimum_age, maximum_age, minimum_words, maximum_words")
+      .select("id, status, is_public, category, opens_at, closes_at, minimum_age, maximum_age, minimum_words, maximum_words")
       .eq("id", data.competitionId)
       .maybeSingle();
     if (competitionError) throw new Error(competitionError.message);
     if (!competition) throw new Error("Competition not found.");
     if (!competitionIsOpen(competition)) throw new Error("Essay submissions are not currently open.");
-    if (data.participantAge < competition.minimum_age || data.participantAge > competition.maximum_age) {
-      throw new Error(`Entrants must be between ${competition.minimum_age} and ${competition.maximum_age} years old.`);
-    }
-    if (competition.minimum_words && data.declaredWordCount < competition.minimum_words) {
-      throw new Error(`The essay must contain at least ${competition.minimum_words.toLocaleString()} words.`);
-    }
-    if (competition.maximum_words && data.declaredWordCount > competition.maximum_words) {
-      throw new Error(`The essay must contain no more than ${competition.maximum_words.toLocaleString()} words.`);
-    }
+    if (competition.category !== "essay") throw new Error("This competition does not accept essay uploads.");
+    validateEligibility(competition, data.participantAge, data.declaredWordCount);
 
     const { data: existing, error: existingError } = await supabaseAdmin
       .from("essay_submissions")
-      .select("id, submission_code, status, revision_number, file_path")
+      .select("id, submission_code, status, revision_number, file_path, pending_file_path")
       .eq("competition_id", competition.id)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -221,7 +210,7 @@ export const prepareEssayUpload = createServerFn({ method: "POST" })
     const submissionCode = existing?.submission_code ?? `BT-${new Date().getUTCFullYear()}-${submissionId.slice(0, 8).toUpperCase()}`;
     const nextRevision = (existing?.revision_number ?? 0) + 1;
     const extension = allowedFileTypes.get(data.mimeType)!;
-    const filePath = `${context.userId}/${submissionId}/revision-${nextRevision}.${extension}`;
+    const filePath = `${context.userId}/${submissionId}/revision-${nextRevision}-${randomUUID()}.${extension}`;
     const now = new Date().toISOString();
 
     const payload = {
@@ -254,9 +243,11 @@ export const prepareEssayUpload = createServerFn({ method: "POST" })
       .from(ESSAY_BUCKET)
       .createSignedUploadUrl(filePath);
     if (signedError || !signed?.token) {
+      await supabaseAdmin.from("essay_submissions").update({ pending_file_path: null, pending_original_filename: null, pending_mime_type: null, pending_file_size: null, pending_file_sha256: null }).eq("id", submissionId).eq("pending_file_path", filePath);
       throw new Error(signedError?.message || "A secure upload slot could not be created.");
     }
 
+    if (existing?.pending_file_path && existing.pending_file_path !== existing.file_path) await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([existing.pending_file_path]);
     return {
       submissionId,
       submissionCode,
@@ -273,7 +264,7 @@ export const finalizeEssayUpload = createServerFn({ method: "POST" })
     const supabaseAdmin = await requireStudent(context.userId);
     const { data: submission, error: readError } = await supabaseAdmin
       .from("essay_submissions")
-      .select("id, submission_code, user_id, status, revision_number, file_path, pending_file_path, pending_original_filename, pending_mime_type, pending_file_size, pending_file_sha256")
+      .select("id, competition_id, submission_code, user_id, status, revision_number, file_path, pending_file_path, pending_original_filename, pending_mime_type, pending_file_size, pending_file_sha256")
       .eq("id", data.submissionId)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -286,6 +277,8 @@ export const finalizeEssayUpload = createServerFn({ method: "POST" })
       throw new Error("The pending upload metadata is incomplete.");
     }
 
+    const { data: competition } = await supabaseAdmin.from("competitions").select("*").eq("id", submission.competition_id).maybeSingle();
+    if (!competition || !competitionIsOpen(competition) || !["draft", "submitted", "withdrawn"].includes(submission.status)) throw new Error("This competition is no longer accepting submissions.");
     try {
       const { data: blob, error: downloadError } = await supabaseAdmin.storage
         .from(ESSAY_BUCKET)
@@ -294,13 +287,13 @@ export const finalizeEssayUpload = createServerFn({ method: "POST" })
       if (blob.size !== Number(submission.pending_file_size)) throw new Error("The uploaded file size does not match the selected file.");
 
       const bytes = new Uint8Array(await blob.arrayBuffer());
-      validateMagicBytes(bytes, submission.pending_mime_type);
+      validateDocument(bytes, submission.pending_mime_type);
       const digest = createHash("sha256").update(bytes).digest("hex");
       if (digest !== submission.pending_file_sha256) throw new Error("The uploaded file did not pass its integrity check.");
 
       const now = new Date().toISOString();
       const nextRevision = submission.revision_number + 1;
-      const { error: finalizeError } = await supabaseAdmin
+      const { data: finalized, error: finalizeError } = await supabaseAdmin
         .from("essay_submissions")
         .update({
           status: "submitted",
@@ -321,8 +314,9 @@ export const finalizeEssayUpload = createServerFn({ method: "POST" })
           admin_note: null,
         })
         .eq("id", submission.id)
-        .eq("pending_file_path", data.filePath);
+        .eq("pending_file_path", data.filePath).select("id").maybeSingle();
       if (finalizeError) throw new Error(finalizeError.message);
+      if (!finalized) throw new Error("This upload slot has changed. Please try again.");
 
       if (submission.file_path && submission.file_path !== data.filePath) {
         await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([submission.file_path]);
@@ -384,8 +378,10 @@ export const withdrawEssaySubmission = createServerFn({ method: "POST" })
   .validator((value: unknown) => SubmissionIdInput.parse(value))
   .handler(async ({ data, context }) => {
     const supabaseAdmin = await requireStudent(context.userId);
-    const competition = await currentCompetition();
-    if (!competitionIsOpen(competition)) throw new Error("Submissions can only be withdrawn while the competition is open.");
+    const { data: entry } = await supabaseAdmin.from("essay_submissions").select("competition_id").eq("id", data.submissionId).eq("user_id", context.userId).maybeSingle();
+    if (!entry) throw new Error("Submission not found.");
+    const { data: competition } = await supabaseAdmin.from("competitions").select("*").eq("id", entry.competition_id).maybeSingle();
+    if (!competition || !competitionIsOpen(competition)) throw new Error("Submissions can only be withdrawn while the competition is open.");
 
     const { data: submission, error } = await supabaseAdmin
       .from("essay_submissions")
@@ -403,16 +399,18 @@ export const withdrawEssaySubmission = createServerFn({ method: "POST" })
 
 export const getEssayAdminState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .validator((value: unknown) => SelectionInput.parse(value))
+  .handler(async ({ context, data }) => {
     const supabaseAdmin = await requireAdmin(context.userId);
-    const competition = await currentCompetition();
+    const competition = await selectedCompetition(data.slug, true);
+    const { data: competitions } = await supabaseAdmin.from("competitions").select("id, slug, title").order("created_at", { ascending: false });
     const { data: submissions, error } = await supabaseAdmin
       .from("essay_submissions")
       .select("id, submission_code, participant_name, participant_age, country, school_name, essay_title, declared_word_count, status, revision_number, original_filename, mime_type, file_size, submitted_at, reviewed_at, admin_note, created_at, updated_at")
       .eq("competition_id", competition.id)
       .order("submitted_at", { ascending: false, nullsFirst: false });
     if (error) throw new Error(error.message);
-    return { competition, submissions: submissions ?? [] };
+    return { competition, competitions: competitions ?? [], submissions: submissions ?? [] };
   });
 
 export const updateCompetition = createServerFn({ method: "POST" })
@@ -420,7 +418,7 @@ export const updateCompetition = createServerFn({ method: "POST" })
   .validator((value: unknown) => CompetitionUpdateInput.parse(value))
   .handler(async ({ data, context }) => {
     const supabaseAdmin = await requireAdmin(context.userId);
-    if (data.maximumAge < data.minimumAge) throw new Error("The maximum age cannot be lower than the minimum age.");
+    if (data.minimumAge !== null && data.maximumAge < data.minimumAge) throw new Error("The maximum age cannot be lower than the minimum age.");
     if (data.minimumWords && data.maximumWords && data.maximumWords < data.minimumWords) {
       throw new Error("The maximum word count cannot be lower than the minimum word count.");
     }
@@ -433,6 +431,11 @@ export const updateCompetition = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin
       .from("competitions")
       .update({
+        category: data.category,
+        is_public: data.isPublic,
+        prompts: data.prompts,
+        public_rules: data.publicRules,
+        results_at: asOptionalIso(data.resultsAt),
         title: data.title,
         summary: data.summary,
         status: data.status,
@@ -473,3 +476,13 @@ export const reviewEssaySubmission = createServerFn({ method: "POST" })
     });
     return { ok: true as const, status: data.status };
   });
+
+export const createCompetition = createServerFn({ method: "POST" })
+ .middleware([requireSupabaseAuth])
+ .validator((v: unknown) => z.object({title:z.string().trim().min(5).max(180),slug:z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(120),category:z.enum(["essay","public-speaking"])}).parse(v))
+ .handler(async ({context,data})=>{
+  const db=await requireAdmin(context.userId);
+  const {error}=await db.from("competitions").insert({title:data.title,slug:data.slug,category:data.category,status:"draft",is_public:false,minimum_age:null,maximum_age:18});
+  if(error) throw new Error("Competition could not be created. Check that its URL name is unique.");
+  return {slug:data.slug};
+ });
