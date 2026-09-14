@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, Newspaper, FileSearch, MessageCircle, Trophy, Users, Sparkles, ShieldCheck, Lock, Scale } from "lucide-react";
+import { ArrowRight, BookOpen, FileSearch, MessageCircle, Trophy, Users, Sparkles, ShieldCheck, Lock, Scale } from "lucide-react";
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 
 export const Route = createFileRoute("/")({
@@ -16,10 +16,9 @@ export const Route = createFileRoute("/")({
 
 const offerings = [
   { icon: Users, title: "About", desc: "Meet Tara and learn the mission behind a platform built so teens can finally access digital legal knowledge.", cta: "Meet Tara & Our Mission", to: "/about" as const },
-  { icon: BookOpen, title: "Resources", desc: "A growing library of guides and PDFs on privacy, social media law, digital contracts, cyberbullying and more.", cta: "Explore the Resource Library", to: "/resources" as const },
-  { icon: Newspaper, title: "Latest News", desc: "Real legal developments — from Instagram encryption to new data privacy laws — broken down for real teens.", cta: "Read the Latest", to: "/news" as const },
+  { icon: BookOpen, title: "Resources", desc: "A growing video library on privacy, social media law, digital contracts, cyberbullying and more.", cta: "Explore the Resource Library", to: "/resources" as const },
   { icon: FileSearch, title: "Contract Decoder", desc: "Paste any Terms & Conditions, privacy policy, or digital agreement. Get back exactly what you're signing up for.", cta: "Try the Contract Decoder", to: "/decoder" as const },
-  { icon: MessageCircle, title: "Ask an Advisor", desc: "Connect with law students and professors volunteering their time. Free, informational, judgment-free.", cta: "Talk to an Advisor", to: "/advisors" as const },
+  { icon: MessageCircle, title: "Ask an Advisor", desc: "Connect with student volunteers volunteering their time. Free, informational, judgment-free.", cta: "Talk to an Advisor", to: "/advisors" as const },
   { icon: Trophy, title: "Competitions", desc: "Essay competitions with cash prizes and other ways to engage with digital rights and get recognised.", cta: "See Competitions", to: "/competitions" as const },
 ];
 
@@ -52,7 +51,7 @@ function Home() {
               {[
                 { icon: ShieldCheck, label: "Plain English" },
                 { icon: Lock, label: "Built for Teens" },
-                { icon: Scale, label: "Reviewed Content" },
+                { icon: Scale, label: "Digital Rights" },
               ].map((b) => (
                 <div key={b.label} className="flex items-center gap-2 rounded-lg border border-navy-deep/10 bg-white/70 backdrop-blur px-3 py-2.5">
                   <b.icon className="h-4 w-4 text-teal" />
