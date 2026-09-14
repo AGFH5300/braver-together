@@ -14,6 +14,7 @@ import {
 
 export const Route = createFileRoute("/resources")({
   head: () => ({
+    links: [{ rel: "canonical", href: "https://bravertogether.site/resources" }],
     meta: [
       { title: "Video Resource Library — BraverTogether" },
       { name: "description", content: "Free teen-friendly videos on privacy, social media law, digital contracts, online safety, AI, and digital rights." },

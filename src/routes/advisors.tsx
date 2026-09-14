@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, BrainCircuit, BriefcaseBusiness, Calendar, CheckCircle2, Loader2, MessageCircle, Send, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/advisors")({
   head: () => ({
+    links: [{ rel: "canonical", href: "https://bravertogether.site/advisors" }],
     meta: [
       { title: "Ask an Advisor — BraverTogether" },
       { name: "description", content: "Start a new digital-law support request, then follow replies in My Support Requests." },
@@ -21,10 +22,12 @@ export const Route = createFileRoute("/advisors")({
       { property: "og:description", content: "Start a support request for educational guidance about digital law and online rights." },
     ],
   }),
+  loader: () => listPublicAdvisors(),
   component: Advisors,
 });
 
 type AdvisorProfile = {
+  linked_user_id: string | null; photo_url: string | null;
   id: string;
   display_name: string;
   headline: string | null;
@@ -49,27 +52,18 @@ const topics = [
 function Advisors() {
   const navigate = useNavigate();
   const createRequest = useServerFn(createSupportRequest);
-  const getPublicAdvisors = useServerFn(listPublicAdvisors);
   const access = useAccountAccess();
-  const [advisors, setAdvisors] = useState<AdvisorProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const advisors = Route.useLoaderData() as AdvisorProfile[];
+  const loading = false;
   const [selectedAdvisor, setSelectedAdvisor] = useState<AdvisorProfile | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState<(typeof topics)[number][0]>("general");
   const [message, setMessage] = useState("");
-  const [allowAi, setAllowAi] = useState(true);
+  const [allowAi, setAllowAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const memberExperience = !access.user || access.account?.role === "member";
 
-  useEffect(() => {
-    void getPublicAdvisors()
-      .then((data) => setAdvisors(data as AdvisorProfile[]))
-      .catch(() => toast.error("Advisor profiles could not be loaded."))
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [getPublicAdvisors]);
 
   const availableCount = useMemo(
     () => advisors.filter((advisor) => advisor.accepting_messages && advisor.availability_status === "available").length,
@@ -104,7 +98,7 @@ function Advisors() {
         subject,
         topic,
         message,
-        advisorId: selectedAdvisor?.id ?? null,
+        advisorId: selectedAdvisor?.linked_user_id ?? null,
         allowAiFallback: !selectedAdvisor && allowAi,
       } });
       toast.success(selectedAdvisor ? "Conversation started" : "Your question was sent to the advisor team");
@@ -169,7 +163,7 @@ function Advisors() {
                   <button onClick={() => openRequest(null)} className="mt-5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white">Start a support request</button>
                 </div>
               ) : advisors.map((advisor) => (
-                <AdvisorCard key={advisor.id} advisor={advisor} showMessage={memberExperience} onMessage={() => openRequest(advisor)} />
+                <AdvisorCard key={advisor.id} advisor={advisor} showMessage={memberExperience} onMessage={() => openRequest(advisor.accepting_messages ? advisor : null)} />
               ))}
             </div>
           </div>
@@ -281,20 +275,20 @@ function AdvisorCard({ advisor, showMessage, onMessage }: { advisor: AdvisorProf
   return (
     <article className="flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:border-teal/40 hover:shadow-card">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mesh font-display font-bold text-white">{advisor.display_name?.[0]?.toUpperCase() || "A"}</div>
+        {advisor.photo_url ? <img src={advisor.photo_url} srcSet={`${advisor.photo_url.replace('-320.webp','-160.webp')} 160w, ${advisor.photo_url} 320w`} sizes="80px" alt={advisor.display_name} width={80} height={80} loading="lazy" className="h-20 w-20 shrink-0 rounded-2xl object-cover" /> : <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-mesh font-display text-2xl font-bold text-white">{advisor.display_name?.[0]?.toUpperCase() || "A"}</div>}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-display text-lg font-bold">{advisor.display_name}</h3>
-          <p className="truncate text-xs text-muted-foreground">{advisor.headline || "Volunteer digital-law advisor"}</p>
+          <h3 className="break-words font-display text-lg font-bold">{advisor.display_name}</h3>
+          <p className="text-xs text-muted-foreground">{advisor.headline || "Volunteer digital-law advisor"}</p>
           <div className="mt-2 flex items-center gap-1.5 text-xs">
             <span className={cn("h-2 w-2 rounded-full", status === "available" ? "bg-teal" : status === "busy" ? "bg-warn" : "bg-muted-foreground/40")} />
             <span className="capitalize text-muted-foreground">{status}</span>
           </div>
         </div>
       </div>
-      {advisor.bio && <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{advisor.bio}</p>}
+      {advisor.bio && <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{advisor.bio}</p>}
       {advisor.focus_areas?.length > 0 && <div className="mt-4 flex flex-wrap gap-1.5">{advisor.focus_areas.slice(0, 4).map((focus) => <span key={focus} className="rounded-full bg-teal/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-teal">{focus}</span>)}</div>}
       <div className="mt-auto flex gap-2 pt-5">
-        {showMessage && <button onClick={onMessage} disabled={!advisor.accepting_messages} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle className="h-3.5 w-3.5" /> Message</button>}
+        {showMessage && <button onClick={onMessage} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"><MessageCircle className="h-3.5 w-3.5" /> {advisor.accepting_messages ? "Message" : "Ask the advisor team"}</button>}
         {advisor.calendly_url && <a href={advisor.calendly_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-full border border-border px-3 text-muted-foreground hover:text-foreground" title="Open booking page"><Calendar className="h-4 w-4" /></a>}
       </div>
     </article>

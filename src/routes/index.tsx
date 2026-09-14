@@ -4,6 +4,7 @@ import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 
 export const Route = createFileRoute("/")({
   head: () => ({
+    links: [{ rel: "canonical", href: "https://bravertogether.site/" }],
     meta: [
       { title: "BraverTogether — Know Your Rights Online" },
       { name: "description", content: "The internet has rules — and most teens never get taught them. We're changing that. Digital legal literacy for teens aged 12–18." },

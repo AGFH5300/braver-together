@@ -47,7 +47,7 @@ function AccountLink({
   messageView,
   onNavigate,
 }: {
-  to: "/messages" | "/meetings" | "/profile" | "/admin-advisors" | "/admin-competitions";
+  to: "/messages" | "/meetings" | "/profile" | "/admin-advisors" | "/admin-competitions" | "/admin-reports";
   label: string;
   icon: ElementType;
   messageView?: "queue";
@@ -146,6 +146,7 @@ function AuthControls({
         </span>
         <AccountLink to="/admin-advisors" label="Advisor Applications" icon={UserRoundPlus} onNavigate={onNavigate} />
         <AccountLink to="/admin-competitions" label="Competition Admin" icon={Trophy} onNavigate={onNavigate} />
+        <AccountLink to="/admin-reports" label="Safety Reports" icon={ShieldCheck} onNavigate={onNavigate} />
         <AccountLink to="/profile" label="My Profile" icon={UserIcon} onNavigate={onNavigate} />
         <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
           <LogOut className="h-3.5 w-3.5" /> Sign out
@@ -319,6 +320,7 @@ function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
 
           {role === "administrator" ? (
             <>
+              <Link to="/admin-reports" onClick={close} className={itemClass}><ShieldCheck className="h-4 w-4 text-teal" /> Safety Reports</Link>
               <Link to="/admin-advisors" onClick={close} className={itemClass}><UserRoundPlus className="h-4 w-4 text-teal" /> Advisor Applications</Link>
               <Link to="/admin-competitions" onClick={close} className={itemClass}><Trophy className="h-4 w-4 text-teal" /> Competition Admin</Link>
               <Link to="/profile" onClick={close} className={itemClass}><UserIcon className="h-4 w-4 text-teal" /> My Profile</Link>
@@ -357,6 +359,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:bg-background focus:p-3">Skip to content</a>
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 max-w-[1800px] items-center gap-3 px-4 py-2 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-2.5">
@@ -411,7 +414,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="min-w-0 flex-1">{children}</main>
 
       <footer className="border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
@@ -425,6 +428,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
           <div>
             <h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4>
             <FooterLinks access={access} />
+            <ul className="mt-4 space-y-2 text-sm text-white/70"><li><Link to="/privacy">Privacy</Link></li><li><Link to="/safety">Safety</Link></li><li><Link to="/community-guidelines">Community Guidelines</Link></li></ul>
           </div>
           <div>
             <h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4>
