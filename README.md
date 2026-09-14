@@ -1,103 +1,50 @@
 # BraverTogether
 
-BraverTogether is a TanStack Start application for teen-friendly digital legal literacy, video resources, Substack news, advisor messaging, meeting scheduling and contract analysis.
+Digital legal literacy for young people. TanStack Start / Router, React 19, TypeScript, Tailwind 4 and Supabase (Auth, Postgres, Storage and Realtime).
 
-## Requirements
+## Run locally or on Replit
 
-- Node.js 22 or newer
-- npm 10 or newer
-- A Supabase project
-- Optional YouTube and OpenAI-compatible API credentials for the integrations that use them
+Use Node 22+ and npm 10+. Run `npm ci`, copy `.env.example` to a local ignored `.env` or enter its variables in Replit Secrets, then run `npm run dev`. The default port is 3000. `npm run dev -- --port 5000` selects another port.
 
-## Local setup
+Required: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY`. `SUPABASE_URL` can override the shared URL on the server. Never put private keys in a `VITE_` variable. Configure your exact test origin in Supabase Auth's Site URL / allowed redirects.
 
-```bash
-npm install
-cp .env.example .env
-npm run dev
-```
+## Schema and security
 
-The development server runs at `http://localhost:3000` unless a different port is supplied.
+Apply repository migrations in order using the Supabase CLI or Dashboard. The September migration preserves the existing essay competition ID and entries while updating its approved content. Apply it before testing this branch. It also adds the public advisor directory, moderation fields, atomic support creation/AI limits, and stronger role and upload guards.
 
-Required browser settings:
+All private files remain in private buckets. Server functions authenticate and authorize privileged work; RLS also protects direct Data API access. A public advisor directory record is content, not an Auth account or permission grant. A linked advisor must have a role, approved application and advisor profile flag; partial state fails closed.
 
-```dotenv
-VITE_SUPABASE_URL=your-project-url
-VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-VITE_GOOGLE_AUTH_ENABLED=false
-```
+`src/integrations/supabase/types.ts` contains the earlier generated baseline. `src/lib/competition-database.types.ts` adds the migration-owned types for the current schema. Regenerate the baseline against the verified live schema after application; do not claim the generated baseline reflects an inaccessible live database.
 
-Required server settings:
+## Product workflows
 
-```dotenv
-SUPABASE_URL=your-project-url
-SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
+- Email OTP signup, then password creation; password sign-in and recovery. Social sign-in is not offered.
+- Members create support requests inside Messages. Advisors claim requests without seeing private messages beforehand. Closing, reporting, unread indicators and realtime are supported.
+- `/advisors` renders the directory on the server. Unlinked profiles offer the general team queue. Linked, approved advisors can receive direct requests when accepting messages.
+- Advisor applications include verified PDF/DOCX CVs. `/admin-advisors` reviews applications; applicants retain member access until approval.
+- `/competitions` lists published database records; `/competitions/$slug` shows details. `/essay-submission?competition=<slug>` selects an essay competition. `/admin-competitions` creates hidden drafts, edits content/dates/prompts, and reviews each competition's entries.
+- Current competition: Digital Legal Rights Essay Competition, 18 and under, maximum 1,500 words, August 7–October 10 inclusive UTC, results October 25, 2026. Only first place carries a $250 cash prize. Public-speaking drafts must remain hidden until founder-approved details exist.
+- Meetings require an assigned human advisor, HTTPS links and the other participant's acceptance. Calendar exports use Google Calendar, Outlook and ICS.
+- `/admin-reports` provides report review, conversation context and resolution notes.
+- `/privacy`, `/safety` and `/community-guidelines` explain service boundaries and information use.
 
-Never expose the service-role key through a `VITE_` variable. Apply the SQL files under `supabase/migrations/` before testing profiles, advisor applications, conversations, meetings or AI limits.
+## Free AI configuration
 
-## Advisor onboarding
+The default compatible endpoint is Groq and model is `openai/gpt-oss-20b`. Use a **Groq Free organization without upgrading to the paid Developer plan**. The application cannot determine the billing plan associated with a key. See `docs/AI_CONFIGURATION.md` for verified sources, limits and privacy settings.
 
-Users apply through `/advisor-application`. Administrators review applications through `/admin-advisors` and can approve, deny, request more information or contact the applicant. Approved users receive the advisor role automatically and can then publish their profile and set their availability.
+Set `DECODER_AI_API_KEY` and optionally `SUPPORT_AI_API_KEY`, or one shared `AI_API_KEY`. Base URLs and model names are shown in `.env.example`. No key is bundled. Missing/unavailable AI produces a labeled Basic clause scan for the decoder; support remains in the human queue. Support AI is opt-in. AI-generated quotes must occur in the supplied text. Limits are atomic in Postgres.
 
-To grant the first administrator role, add an `admin` row for that user in `public.user_roles` through a trusted Supabase administration workflow. Do not expose an admin-role assignment endpoint to the browser.
-
-## Meetings
-
-Once a human advisor is assigned to a conversation, either participant can propose a date, time and HTTPS meeting link from `/meetings`. The other participant must accept before it is confirmed. Confirmed meetings can be added to Google Calendar, Outlook or downloaded as an `.ics` file.
-
-## Google sign-in
-
-Keep `VITE_GOOGLE_AUTH_ENABLED=false` until Google is configured under **Supabase Dashboard → Authentication → Providers**. Add the local and deployed `/auth` URLs to the allowed redirect URLs, then set the flag to `true`:
-
-```text
-http://localhost:3000/auth
-https://your-domain.example/auth
-```
-
-## Optional YouTube comments
-
-Video embeds work without an API key. Add this only when public comments should appear alongside published resources:
-
-```dotenv
-YOUTUBE_API_KEY=your-youtube-data-api-key
-```
-
-## Optional AI providers
-
-The support helper and Contract Decoder accept OpenAI-compatible providers and can use separate keys and models:
-
-```dotenv
-AI_API_KEY=
-AI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=
-
-SUPPORT_AI_API_KEY=
-SUPPORT_AI_BASE_URL=
-SUPPORT_AI_MODEL=
-
-DECODER_AI_API_KEY=
-DECODER_AI_BASE_URL=
-DECODER_AI_MODEL=
-DECODER_AI_STRUCTURED_OUTPUTS=true
-```
-
-Both features fail closed with a user-friendly unavailable message when credentials are absent. API keys remain server-only, and persistent daily limits are stored in Supabase.
+YouTube privacy-enhanced embeds need no API key. `YOUTUBE_API_KEY` optionally enables comments and stays server-only.
 
 ## Checks
 
-```bash
-npm run check
-```
+- `npm run check`: build, generated routes, TypeScript, ESLint, unit tests and isolated PostgreSQL tests.
+- `npm test`: logic tests and all migrations against PGlite, with disposable local roles and RLS assertions. This does not create real Supabase Auth accounts or replace hosted E2E tests.
+- `node scripts/cleanup-pending-uploads.mjs`: dry-run interrupted uploads older than 24 hours. Add `--apply` for cleanup. Existing verified files are excluded. Requires server credentials.
+- `node scripts/promote-admin.mjs --help`: trusted administrator bootstrap. The desired account must complete normal signup first; no public bootstrap endpoint exists.
 
-This generates the route tree through a production build, then runs TypeScript and ESLint.
+See `docs/PRE_RENDER_PRODUCTION_TEST_CHECKLIST.md` and `docs/READINESS_RESULTS.md`. Replit acceptance and deployment are owner-operated. No production deployment is performed by this branch.
 
-## Production
+## Production, when the owner is ready
 
-```bash
-npm run build
-npm start
-```
-
-The production server is generated under `.output/` and listens on the platform-provided host and port.
+Run `npm run build` then `npm start`. Set the production Auth Site URL and allowed redirects deliberately. Canonicals, social metadata and sitemap use `https://bravertogether.site`. Keep test environments private/noindexed at the hosting layer. Submit the sitemap to Search Console after verifying domain ownership; indexing and ranking are not guaranteed.

@@ -7,7 +7,6 @@ This checklist is for the team preparing the site for a real pilot. Complete it 
 Before testing, record one owner for each area:
 
 - Product/competition rules
-- Substack/news
 - YouTube/resources
 - Student account testing
 - Advisor testing
@@ -40,53 +39,6 @@ Recommended: use a shared test-account register in the team password manager. Ne
 - Confirm invalid credentials show a normal in-page error.
 - Confirm signing out returns the user to a public page.
 - Confirm protected routes redirect signed-out visitors to `/auth`.
-
-### Google authentication
-
-Keep `VITE_GOOGLE_AUTH_ENABLED=false` until the provider is fully configured.
-
-When ready:
-
-- Enable Google in Supabase Authentication providers.
-- Add the local, Replit and production `/auth` callback URLs to the allowed redirect URLs.
-- Set `VITE_GOOGLE_AUTH_ENABLED=true` in the deployment environment.
-- Test successful sign-in, cancelled sign-in and a browser Back action.
-- Confirm the Google button never remains stuck after returning to the page.
-
-## 4. Publish real Substack content
-
-The News page cannot be considered verified with an empty publication.
-
-The content team must publish at least two genuine Substack articles:
-
-### Article 1
-
-- 700–1,200 words
-- A clear title
-- A cover image with permission to use it
-- A short introduction
-- At least three useful subheadings
-- A conclusion or practical takeaway
-- A named author
-
-Suggested topic: **What teenagers should know before accepting an app's terms and conditions**.
-
-### Article 2
-
-Use a visibly different structure and image so the feed parser is tested properly.
-
-Suggested topic: **How social-media platforms collect and use young people's data**.
-
-### News verification
-
-After publication:
-
-- Open `/news` in a private/incognito window.
-- Confirm both articles appear in newest-first order.
-- Confirm titles, author names, dates, excerpts and cover images are correct.
-- Open each article from the site.
-- Temporarily test the cached fallback by blocking the Substack feed or using a local invalid feed URL in a disposable environment. Confirm the page serves saved posts instead of showing a technical error.
-- Check mobile card layout and long article titles.
 
 ## 5. Upload real YouTube resources
 
@@ -402,9 +354,7 @@ Before public launch:
 
 The site is ready for a controlled pilot only when:
 
-- Two real Substack posts display correctly.
 - Two real YouTube videos display and play correctly.
-- Google or email authentication has been tested end to end.
 - A student PDF and DOCX submission have been verified and downloaded.
 - Advisor application and approval work.
 - Two-way realtime messaging passes the simultaneous-user tests.
@@ -413,3 +363,21 @@ The site is ready for a controlled pilot only when:
 - Production build, TypeScript, ESLint and Supabase security checks pass.
 - The competition rules and privacy notice are published.
 - Every section above has a named owner and sign-off date.
+
+
+## September 2026 acceptance additions
+
+- [ ] Apply the September migration in the test project; confirm all migration files match history.
+- [ ] Public navigation omits Team and News; old routes redirect to About.
+- [ ] Verify the four exact founder prompts, no minimum age or words, max 1,500, 18 and under, $250 first prize only, October 10 inclusive UTC deadline, October 25 results.
+- [ ] Create a second hidden competition draft; ensure it does not appear on the public listing or sitemap. Switch competitions in administration.
+- [ ] Upload a genuine DOCX and PDF for an essay and CV. Reject renamed ZIP, fake PDF, MIME mismatch, oversized files and bad hash.
+- [ ] Fail a replacement; original verified file remains downloadable. Retry and finalize a fresh slot. Try concurrent slots and finalization after closing.
+- [ ] Review six advisor bios and five portraits; no contact details appear in portraits. Qurratulain has neutral initials.
+- [ ] Unlinked profiles use the team queue. Linking grants no role. Linked unpublished or unapproved profiles cannot receive direct messages.
+- [ ] Admin-only safety reports load, show context and save review/resolution notes. Member and advisor requests are rejected.
+- [ ] Support AI defaults off, explains Groq processing, and cannot post after human claim.
+- [ ] Decoder basic fallback is labeled Basic clause scan; configured AI quotes match input exactly; verify quota and outage behavior.
+- [ ] Visit privacy, safety and community guidelines, including the signup link.
+- [ ] Check canonical links, social-card.png, robots.txt, sitemap.xml and private-route noindex tags.
+- [ ] Run npm run check and record actual results; do not treat isolated database tests as hosted email/realtime acceptance.

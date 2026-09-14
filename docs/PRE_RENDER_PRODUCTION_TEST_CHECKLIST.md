@@ -1,10 +1,10 @@
 # BraverTogether Pre-Render Production Test Checklist
 
-Complete this checklist in Replit/local development before any Render deployment. Render is the final deployment step only after every required item below is signed off.
+Complete this checklist in Replit/local development before any Render deployment. The owner runs Replit acceptance and performs deployment manually after sign-off.
 
 ## 0. Test-control rules
 
-- Keep the essay competition in `draft` except during controlled submission tests.
+- Test with disposable accounts in a test database. Do not close the real published competition for testing.
 - Use test accounts and test content only.
 - Do not test every role from one account.
 - Do not paste service-role, AI or YouTube keys into source code, screenshots, chat or browser fields.
@@ -37,7 +37,6 @@ Confirm these exist in Replit Secrets:
 ```dotenv
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
-VITE_GOOGLE_AUTH_ENABLED=false
 SUPABASE_URL=
 SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -115,9 +114,7 @@ Signed out, test:
 
 - `/`
 - `/about`
-- `/team`
 - `/resources`
-- `/news`
 - `/advisors`
 - `/competitions`
 - `/decoder`
@@ -159,7 +156,6 @@ Using Student A:
 - refresh and confirm the session persists
 - sign out and confirm protected routes redirect to `/auth`
 - browser Back does not leave a button stuck
-- disabled Google sign-in shows normal explanatory copy and never raw JSON
 
 Protected-route checks while signed out:
 
@@ -499,26 +495,6 @@ With an assigned open conversation:
 - confirm unrelated user cannot access proposal
 - confirm closed or unassigned conversations cannot create meetings
 
-## 16. Substack/news
-
-Publish two genuine Substack articles with different:
-
-- title lengths
-- authors where possible
-- cover images
-- structures
-- publication dates
-
-Test `/news`:
-
-- newest first
-- correct title, author, date, excerpt and image
-- links open the correct articles
-- incognito works
-- mobile cards work
-- long titles do not overflow
-- cached fallback shows saved posts instead of a technical error
-
 ## 17. YouTube/resources
 
 Upload two real public or unlisted videos with:
@@ -607,7 +583,6 @@ Do not deploy to Render until all are true:
 - realtime messaging and simultaneous claiming pass
 - privacy/RLS tests pass
 - meeting acceptance and calendar exports pass
-- two Substack posts display
 - two YouTube videos display
 - browser/mobile matrix passes
 - no raw JSON, stack trace or secret appears to users
@@ -627,3 +602,21 @@ At that point only:
 7. deploy latest `main`
 8. run a short production smoke test with one test account
 9. keep the real essay competition closed until the public launch decision
+
+
+## September 2026 acceptance additions
+
+- [ ] Apply the September migration in the test project; confirm all migration files match history.
+- [ ] Public navigation omits Team and News; old routes redirect to About.
+- [ ] Verify the four exact founder prompts, no minimum age or words, max 1,500, 18 and under, $250 first prize only, October 10 inclusive UTC deadline, October 25 results.
+- [ ] Create a second hidden competition draft; ensure it does not appear on the public listing or sitemap. Switch competitions in administration.
+- [ ] Upload a genuine DOCX and PDF for an essay and CV. Reject renamed ZIP, fake PDF, MIME mismatch, oversized files and bad hash.
+- [ ] Fail a replacement; original verified file remains downloadable. Retry and finalize a fresh slot. Try concurrent slots and finalization after closing.
+- [ ] Review six advisor bios and five portraits; no contact details appear in portraits. Qurratulain has neutral initials.
+- [ ] Unlinked profiles use the team queue. Linking grants no role. Linked unpublished or unapproved profiles cannot receive direct messages.
+- [ ] Admin-only safety reports load, show context and save review/resolution notes. Member and advisor requests are rejected.
+- [ ] Support AI defaults off, explains Groq processing, and cannot post after human claim.
+- [ ] Decoder basic fallback is labeled Basic clause scan; configured AI quotes match input exactly; verify quota and outage behavior.
+- [ ] Visit privacy, safety and community guidelines, including the signup link.
+- [ ] Check canonical links, social-card.png, robots.txt, sitemap.xml and private-route noindex tags.
+- [ ] Run npm run check and record actual results; do not treat isolated database tests as hosted email/realtime acceptance.

@@ -239,7 +239,7 @@ Run these using real inboxes from at least Gmail and Outlook:
 10. New password works; old password no longer works.
 11. Password-changed security notification arrives.
 12. If email change is enabled in the UI, both the confirmation and email-changed security notification are tested.
-13. Google OAuth remains disabled until its provider credentials and exact callback URLs are configured.
+13. Social sign-in is intentionally absent. Verify the email OTP and password flows.
 14. No auth email contains a Resend tracking redirect.
 15. SPF and DKIM pass; DMARC alignment is checked after DMARC is published.
 16. Supabase Auth logs and Resend delivery logs show no unexpected rejects, bounces or rate-limit errors.
