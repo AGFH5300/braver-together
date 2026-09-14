@@ -19,6 +19,11 @@ for(const [table,bucket,pending,verified] of [['essay_submissions','essay-submis
   if(clearError) throw new Error('Pending upload metadata could not be cleared.');
   if(!cleared) continue;
   const {error:removeError}=await db.storage.from(bucket).remove([row[pending]]);
-  if(removeError) throw new Error('Metadata cleared but expired object cleanup needs retry.');
+  if(removeError) {
+   // Retain the orphan locator in operator output because the cleared slot will
+   // no longer be found by a subsequent metadata scan. Do not publish this log.
+   console.error(JSON.stringify({bucket, path:row[pending], action:'retry storage removal'}));
+   throw new Error('Metadata cleared; retry removal of the object identified in the private operator log.');
+  }
  }
 }

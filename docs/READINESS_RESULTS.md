@@ -13,7 +13,7 @@ Branch: `work/final-production-readiness`. Deployment and merge are reserved for
 
 ## Verification
 
-`npm run check` runs the production build, TypeScript, ESLint, unit tests, and migration/RLS tests. The database suite applies all migrations to isolated PGlite with Auth/Storage stubs. It tests restricted roles, pre-claim message isolation, unrelated access denial, sequential claim contention, late AI delivery rejection, closed-thread send denial, directory column permissions, and usage limits. These are local database tests, not hosted Supabase end-to-end tests.
+`npm run check` passed: production build, TypeScript, ESLint (0 errors, 15 warnings), all 23 unit tests, and migration/RLS tests. The database suite applies all migrations to isolated PGlite with Auth/Storage stubs. It tests restricted roles, pre-claim message isolation, unrelated access denial, sequential claim contention, late AI delivery rejection, closed-thread send denial, directory column permissions, and usage limits. These are local database tests, not hosted Supabase end-to-end tests.
 
 `node scripts/smoke-public.mjs` passed against disposable local public-data fixtures: ten public pages, competition content, advisor content/photos, canonical metadata, private noindex, redirects, sitemap, and assets. This checks server-rendered HTML, not browser interaction or visual layout.
 
