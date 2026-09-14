@@ -1,0 +1,57 @@
+import { PGlite } from '@electric-sql/pglite';
+import {readFile,readdir} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+CREATE SCHEMA auth; CREATE SCHEMA storage;
+CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,raw_user_meta_data jsonb DEFAULT '{}',created_at timestamptz DEFAULT now());
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+GRANT USAGE ON SCHEMA public,auth,storage TO anon,authenticated,service_role;
+CREATE PUBLICATION supabase_realtime;
+`);
+for(const file of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort()){
+ try{await db.exec(await readFile('supabase/migrations/'+file,'utf8')); console.log('Applied',file);}catch(e){console.error('Failed',file,e.message);process.exit(1);}
+}
+const {rows:[c]}=await db.query('select * from public.competitions');
+assert.equal(c.title,'Digital Legal Rights Essay Competition');assert.equal(c.minimum_age,null);assert.equal(c.minimum_words,null);assert.equal(c.maximum_words,1500);assert.equal(c.prompts.length,4);assert.equal(c.status,'open');
+assert.equal((await db.query('select count(*)::int n from public.public_advisors')).rows[0].n,6);
+await db.exec('SET ROLE anon');
+assert.equal((await db.query('select display_name from public.public_advisors')).rows.length,6);
+await assert.rejects(db.query('select linked_user_id from public.public_advisors'));
+await assert.rejects(db.query("select public.consume_ai_allowance('decoder','test',10)"));
+await db.exec('RESET ROLE; SET ROLE service_role');
+for(let i=0;i<10;i++) assert.equal((await db.query("select public.consume_ai_allowance('decoder','test',10) as remaining")).rows[0].remaining,9-i);
+await assert.rejects(db.query("select public.consume_ai_allowance('decoder','test',10)"));
+await db.exec('RESET ROLE');
+// Disposable identities exist only inside this isolated test database.
+const member='11111111-1111-4111-8111-111111111111', advisor='22222222-2222-4222-8222-222222222222', other='33333333-3333-4333-8333-333333333333';
+await db.exec(`SET request.jwt.claims='{"role":"service_role"}'; INSERT INTO auth.users(id,email) VALUES('${member}','member@example.invalid'),('${advisor}','advisor@example.invalid'),('${other}','other@example.invalid');
+INSERT INTO public.user_roles(user_id,role) VALUES('${advisor}','advisor');
+UPDATE public.profiles SET is_advisor=true,is_public=true WHERE id='${advisor}';`);
+await db.exec(`SET ROLE authenticated; SET request.jwt.claim.sub='${advisor}'`);
+assert.equal((await db.query('select private.current_account_role() as role')).rows[0].role,'restricted');
+await db.exec(`RESET ROLE; INSERT INTO public.advisor_applications(user_id,full_name,email,experience,motivation,status) VALUES('${advisor}','Advisor','advisor@example.invalid','Educational experience','Help young people','approved');`);
+await db.exec(`SET ROLE authenticated; SET request.jwt.claim.sub='${advisor}'`);
+assert.equal((await db.query('select private.current_account_role() as role')).rows[0].role,'advisor');
+await db.exec(`SET request.jwt.claim.sub='${member}'; SET request.jwt.claims='{"role":"authenticated"}';`);
+const thread=(await db.query(`INSERT INTO public.conversations(teen_id,subject,topic,ai_fallback_enabled) VALUES('${member}','Privacy question','privacy',true) RETURNING id`)).rows[0].id;
+await db.exec(`INSERT INTO public.messages(conversation_id,sender_id,body,sender_kind) VALUES('${thread}','${member}','A private question from a member.','human');`);
+await db.exec(`SET request.jwt.claim.sub='${advisor}'`);
+assert.equal((await db.query(`select id from public.conversations where id='${thread}'`)).rows.length,1);
+assert.equal((await db.query(`select body from public.messages where conversation_id='${thread}'`)).rows.length,0);
+await db.exec(`SET request.jwt.claim.sub='${other}'`);
+assert.equal((await db.query(`select id from public.conversations where id='${thread}'`)).rows.length,0);
+await assert.rejects(db.query(`INSERT INTO public.messages(conversation_id,sender_id,body,sender_kind) VALUES('${thread}','${other}','Unrelated person trying to send','human')`));
+await db.exec(`RESET ROLE; SET ROLE service_role; SET request.jwt.claims='{"role":"service_role"}';`);
+assert.equal((await db.query(`UPDATE public.conversations SET advisor_id='${advisor}' WHERE id='${thread}' AND advisor_id IS NULL RETURNING id`)).rows.length,1);
+assert.equal((await db.query(`UPDATE public.conversations SET advisor_id='${other}' WHERE id='${thread}' AND advisor_id IS NULL RETURNING id`)).rows.length,0);
+await assert.rejects(db.query(`INSERT INTO public.messages(conversation_id,sender_kind,body) VALUES('${thread}','ai','AI response after claim')`));
+await db.exec(`RESET ROLE; SET ROLE authenticated; SET request.jwt.claim.sub='${advisor}'; SET request.jwt.claims='{"role":"authenticated"}';`);
+assert.equal((await db.query(`select body from public.messages where conversation_id='${thread}'`)).rows.length,1);
+await db.exec(`RESET ROLE; SET ROLE service_role; SET request.jwt.claims='{"role":"service_role"}'; UPDATE public.conversations SET status='closed' WHERE id='${thread}'; RESET ROLE; SET ROLE authenticated; SET request.jwt.claim.sub='${member}'; SET request.jwt.claims='{"role":"authenticated"}';`);
+await assert.rejects(db.query(`INSERT INTO public.messages(conversation_id,sender_id,body,sender_kind) VALUES('${thread}','${member}','Message after closing','human')`));
+await db.exec('RESET ROLE');
+console.log('Queue privacy, competing claims, cross-account access, role inconsistency, AI handoff and closed-thread permissions passed.');
+console.log('Database migrations, public directory grants, competition source and atomic usage allowance passed.');
+await db.close();

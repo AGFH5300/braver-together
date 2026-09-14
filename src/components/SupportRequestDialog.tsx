@@ -30,7 +30,7 @@ export function SupportRequestDialog({
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState<Topic>("general");
   const [message, setMessage] = useState("");
-  const [allowAi, setAllowAi] = useState(true);
+  const [allowAi, setAllowAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -158,7 +158,7 @@ export function SupportRequestDialog({
               <BrainCircuit className="h-4 w-4 text-teal" /> Allow limited AI help while waiting
             </span>
             <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-              The request still stays in the human advisor queue. The AI option is only available when no approved advisor is currently available.
+              If selected, your question and relevant conversation context may be sent to Groq. Do not include personal or confidential information. The request still stays in the human advisor queue. The AI option is only available when no approved advisor is currently available.
             </span>
           </span>
         </label>

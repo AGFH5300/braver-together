@@ -26,31 +26,8 @@ export async function consumeAiAllowance({
   dailyLimit: number;
 }): Promise<{ remaining: number }> {
   const actorKey = hashActor(userId ? `user:${userId}` : `ip:${requestAddress()}`);
-  const usageDate = new Date().toISOString().slice(0, 10);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const { data: current, error: readError } = await supabaseAdmin
-    .from("ai_usage_daily")
-    .select("request_count")
-    .eq("feature", feature)
-    .eq("actor_key", actorKey)
-    .eq("usage_date", usageDate)
-    .maybeSingle();
-
-  if (readError) throw new Error("Could not verify the AI usage limit");
-  const used = current?.request_count ?? 0;
-  if (used >= dailyLimit) {
-    throw new Error(`Daily ${feature} AI limit reached. A human advisor can still reply when available.`);
-  }
-
-  const { error: writeError } = await supabaseAdmin.from("ai_usage_daily").upsert({
-    feature,
-    actor_key: actorKey,
-    usage_date: usageDate,
-    request_count: used + 1,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "feature,actor_key,usage_date" });
-
-  if (writeError) throw new Error("Could not update the AI usage limit");
-  return { remaining: Math.max(0, dailyLimit - used - 1) };
+  const { data, error } = await supabaseAdmin.rpc("consume_ai_allowance", { p_feature: feature, p_actor_key: actorKey, p_limit: dailyLimit });
+  if (error || data === null) throw new Error("AI is unavailable or today's limit has been reached. Please try again later.");
+  return { remaining: data };
 }

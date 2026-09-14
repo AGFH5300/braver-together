@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 import {
+  createCompetition,
   getEssayAdminState,
   getEssaySubmissionDownload,
   reviewEssaySubmission,
@@ -28,13 +29,14 @@ export const Route = createFileRoute("/_authenticated/admin-competitions")({
 });
 
 type Competition = {
+  slug: string; category: "essay" | "public-speaking"; is_public: boolean; prompts: string[]; public_rules: string; results_at: string | null;
   id: string;
   title: string;
   summary: string;
   status: "draft" | "open" | "closed" | "judging" | "published";
   opens_at: string | null;
   closes_at: string | null;
-  minimum_age: number;
+  minimum_age: number | null;
   maximum_age: number;
   minimum_words: number | null;
   maximum_words: number | null;
@@ -63,7 +65,7 @@ type Submission = {
   updated_at: string;
 };
 
-type AdminState = { competition: Competition; submissions: Submission[] };
+type AdminState = { competitions: { id: string; slug: string; title: string }[]; competition: Competition; submissions: Submission[] };
 
 type CompetitionForm = {
   title: string;
@@ -102,7 +104,7 @@ function toForm(competition: Competition): CompetitionForm {
     status: competition.status,
     opensAt: localDateTime(competition.opens_at),
     closesAt: localDateTime(competition.closes_at),
-    minimumAge: String(competition.minimum_age),
+    minimumAge: competition.minimum_age === null ? "" : String(competition.minimum_age),
     maximumAge: String(competition.maximum_age),
     minimumWords: competition.minimum_words ? String(competition.minimum_words) : "",
     maximumWords: competition.maximum_words ? String(competition.maximum_words) : "",
@@ -113,7 +115,14 @@ function toForm(competition: Competition): CompetitionForm {
 
 function AdminCompetitionsPage() {
   const getState = useServerFn(getEssayAdminState);
+  const [selected, setSelected] = useState<string | undefined>();
   const saveCompetition = useServerFn(updateCompetition);
+  const create = useServerFn(createCompetition);
+  const [draftTitle,setDraftTitle]=useState("");
+  const [draftSlug,setDraftSlug]=useState("");
+  const [draftCategory,setDraftCategory]=useState<"essay"|"public-speaking">("essay");
+  async function addDraft(){setSaving(true);try{const result=await create({data:{title:draftTitle,slug:draftSlug,category:draftCategory}});setSelected(result.slug);await load(result.slug);setDraftTitle("");setDraftSlug("");}catch{toast.error("Could not create the competition. Use a unique URL name.");}finally{setSaving(false);}}
+
   const [state, setState] = useState<AdminState | null>(null);
   const [form, setForm] = useState<CompetitionForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,10 +133,10 @@ function AdminCompetitionsPage() {
     void load();
   }, []);
 
-  async function load() {
+  async function load(slug = selected) {
     setLoading(true);
     try {
-      const result = await getState();
+      const result = await getState({ data: { slug } });
       const next = result as AdminState;
       setState(next);
       setForm(toForm(next.competition));
@@ -147,12 +156,17 @@ function AdminCompetitionsPage() {
       await saveCompetition({
         data: {
           competitionId: state.competition.id,
+          category: state.competition.category,
+          isPublic: state.competition.is_public,
+          prompts: state.competition.prompts,
+          publicRules: state.competition.public_rules,
+          resultsAt: state.competition.results_at ?? "",
           title: form.title,
           summary: form.summary,
           status: form.status,
           opensAt: form.opensAt ? new Date(form.opensAt).toISOString() : "",
           closesAt: form.closesAt ? new Date(form.closesAt).toISOString() : "",
-          minimumAge: Number(form.minimumAge),
+          minimumAge: form.minimumAge === "" ? null : Number(form.minimumAge),
           maximumAge: Number(form.maximumAge),
           minimumWords: form.minimumWords ? Number(form.minimumWords) : null,
           maximumWords: form.maximumWords ? Number(form.maximumWords) : null,
@@ -209,7 +223,13 @@ function AdminCompetitionsPage() {
             <label className="block lg:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Public summary</span><textarea value={form.summary} onChange={(event) => setForm((current) => current ? { ...current, summary: event.target.value } : current)} required minLength={20} maxLength={3000} rows={4} className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-teal/40" /></label>
             <Field label="Opening date and time" type="datetime-local" value={form.opensAt} onChange={(value) => setForm((current) => current ? { ...current, opensAt: value } : current)} icon={CalendarClock} />
             <Field label="Closing date and time" type="datetime-local" value={form.closesAt} onChange={(value) => setForm((current) => current ? { ...current, closesAt: value } : current)} icon={CalendarClock} />
-            <Field label="Minimum age" type="number" min={1} max={120} value={form.minimumAge} onChange={(value) => setForm((current) => current ? { ...current, minimumAge: value } : current)} required />
+            <details className="rounded-xl border p-4"><summary className="cursor-pointer font-semibold">Create a draft competition</summary><div className="mt-4 grid gap-3"><label>Title<input className="block w-full rounded-lg border p-2" value={draftTitle} onChange={e=>setDraftTitle(e.target.value)} /></label><label>URL name<input className="block w-full rounded-lg border p-2" placeholder="competition-name-2026" value={draftSlug} onChange={e=>setDraftSlug(e.target.value)} /></label><label>Category<select className="block w-full rounded-lg border p-2" value={draftCategory} onChange={e=>setDraftCategory(e.target.value as "essay"|"public-speaking")}><option value="essay">Essay</option><option value="public-speaking">Public speaking</option></select></label><button type="button" disabled={saving||draftTitle.length<5||!draftSlug} onClick={addDraft} className="rounded-full border px-4 py-2">Create hidden draft</button></div></details>
+            <label className="grid gap-2 text-sm">Results date (UTC)<input type="date" className="rounded-xl border p-3" value={state.competition.results_at?.slice(0,10)??""} onChange={e=>setState({...state,competition:{...state.competition,results_at:e.target.value?`${e.target.value}T00:00:00Z`:null}})} /></label>
+            <label className="grid gap-2 text-sm">Competition<select aria-label="Competition" value={state.competition.slug} onChange={e => { setSelected(e.target.value); void load(e.target.value); }} className="rounded-xl border bg-background p-3">{state.competitions.map(c => <option key={c.id} value={c.slug}>{c.title}</option>)}</select></label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={state.competition.is_public} onChange={e => setState({ ...state, competition: { ...state.competition, is_public: e.target.checked } })} />Publicly visible (drafts remain hidden)</label>
+            <label className="grid gap-2 text-sm">Prompts (separate with a blank line)<textarea className="min-h-48 rounded-xl border p-3" value={state.competition.prompts.join('\n\n')} onChange={e => setState({ ...state, competition: { ...state.competition, prompts: e.target.value.split('\n\n') } })} /></label>
+            <label className="grid gap-2 text-sm">Public rules<textarea className="min-h-32 rounded-xl border p-3" value={state.competition.public_rules} onChange={e => setState({ ...state, competition: { ...state.competition, public_rules: e.target.value } })} /></label>
+            <Field label="Minimum age (optional)" type="number" min={0} max={120} value={form.minimumAge} onChange={(value) => setForm((current) => current ? { ...current, minimumAge: value } : current)} />
             <Field label="Maximum age" type="number" min={1} max={120} value={form.maximumAge} onChange={(value) => setForm((current) => current ? { ...current, maximumAge: value } : current)} required />
             <Field label="Minimum words (optional)" type="number" min={1} max={50000} value={form.minimumWords} onChange={(value) => setForm((current) => current ? { ...current, minimumWords: value } : current)} />
             <Field label="Maximum words (optional)" type="number" min={1} max={50000} value={form.maximumWords} onChange={(value) => setForm((current) => current ? { ...current, maximumWords: value } : current)} />
@@ -224,7 +244,7 @@ function AdminCompetitionsPage() {
         </form>
 
         <div className="mt-10">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-widest text-teal">Verified entries</div><h2 className="mt-2 text-3xl font-bold">Submission review</h2></div><button onClick={load} className="rounded-full border border-border px-4 py-2 text-sm font-semibold">Refresh</button></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-widest text-teal">Verified entries</div><h2 className="mt-2 text-3xl font-bold">Submission review</h2></div><button onClick={() => load()} className="rounded-full border border-border px-4 py-2 text-sm font-semibold">Refresh</button></div>
 
           {state.submissions.length === 0 ? (
             <div className="mt-6 rounded-3xl border border-dashed border-border bg-card p-12 text-center"><FileText className="mx-auto h-10 w-10 text-muted-foreground/50" /><h3 className="mt-4 text-xl font-bold">No entries have been created.</h3><p className="mt-2 text-sm text-muted-foreground">Open the portal and submit a test entry from a student account to verify the full workflow.</p></div>

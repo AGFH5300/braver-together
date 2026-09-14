@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { loadAccountAccessState } from "@/lib/account-access.functions";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ConversationInput = z.object({ conversationId: z.string().uuid() });
@@ -44,6 +45,8 @@ async function getConversationForParticipant(conversationId: string, userId: str
   if (!data || (data.teen_id !== userId && data.advisor_id !== userId)) {
     throw new Error("You do not have access to that conversation.");
   }
+  const access = await loadAccountAccessState(userId);
+  if ((data.teen_id === userId && access.role !== "member") || (data.advisor_id === userId && access.role !== "advisor")) throw new Error("Your account cannot access these meetings.");
   return { supabaseAdmin, conversation: data };
 }
 
@@ -119,6 +122,7 @@ export const respondMeetingProposal = createServerFn({ method: "POST" })
     if (!proposal) throw new Error("Meeting proposal not found.");
 
     const { conversation } = await getConversationForParticipant(proposal.conversation_id, context.userId);
+    if (data.action !== "cancelled" && (conversation.status !== "open" || !conversation.advisor_id)) throw new Error("This conversation cannot schedule meetings.");
     if (proposal.status !== "pending") throw new Error("This meeting proposal has already been answered.");
     if (data.action === "cancelled" && proposal.proposer_id !== context.userId) {
       throw new Error("Only the person who proposed the meeting can cancel it.");

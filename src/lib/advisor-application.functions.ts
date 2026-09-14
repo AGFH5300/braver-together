@@ -1,3 +1,4 @@
+import { validateDocument } from "@/lib/document-validation";
 import { createHash, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -81,19 +82,6 @@ function validateCvMetadata(filename: string, mimeType: string, size: number) {
   }
 }
 
-function validateMagicBytes(bytes: Uint8Array, mimeType: string) {
-  if (mimeType === PDF_MIME) {
-    const header = new TextDecoder().decode(bytes.slice(0, 5));
-    if (header !== "%PDF-") throw new Error("The uploaded CV does not contain a valid PDF header.");
-    return;
-  }
-
-  const zipHeader = Array.from(bytes.slice(0, 4)).join(",");
-  const validZipHeaders = new Set(["80,75,3,4", "80,75,5,6", "80,75,7,8"]);
-  if (!validZipHeaders.has(zipHeader)) {
-    throw new Error("The uploaded CV does not contain a valid DOCX/ZIP header.");
-  }
-}
 
 async function requireAdmin(userId: string) {
   await requireAccountRole(userId, ["administrator"]);
@@ -294,7 +282,7 @@ export const prepareAdvisorCvUpload = createServerFn({ method: "POST" })
           pending_cv_file_sha256: null,
           pending_previous_status: null,
         })
-        .eq("id", applicationId);
+        .eq("id", applicationId).eq("pending_cv_file_path", filePath);
       throw new Error(signedError?.message || "The CV upload could not be started.");
     }
 
@@ -332,14 +320,14 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
       }
 
       const bytes = new Uint8Array(await blob.arrayBuffer());
-      validateMagicBytes(bytes, application.pending_cv_mime_type);
+      validateDocument(bytes, application.pending_cv_mime_type);
       const digest = createHash("sha256").update(bytes).digest("hex");
       if (digest !== application.pending_cv_file_sha256) {
         throw new Error("The uploaded CV did not pass its integrity check.");
       }
 
       const now = new Date().toISOString();
-      const { error: finalizeError } = await supabaseAdmin
+      const { data: finalized, error: finalizeError } = await supabaseAdmin
         .from("advisor_applications")
         .update({
           status: "pending",
@@ -360,8 +348,9 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
           admin_note: null,
         })
         .eq("id", application.id)
-        .eq("pending_cv_file_path", data.filePath);
+        .eq("pending_cv_file_path", data.filePath).select("id").maybeSingle();
       if (finalizeError) throw new Error(finalizeError.message);
+      if (!finalized) throw new Error("This upload slot has changed. Select the file again.");
 
       if (application.cv_file_path && application.cv_file_path !== data.filePath) {
         await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([application.cv_file_path]);
