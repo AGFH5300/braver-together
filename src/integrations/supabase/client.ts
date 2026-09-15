@@ -27,29 +27,39 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
-async function maySendSignupOtp(
-  supabaseUrl: string,
-  supabaseKey: string,
-  email: string,
-): Promise<boolean> {
-  const response = await fetch(
-    `${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/can_send_signup_otp`,
-    {
-      method: "POST",
-      headers: {
-        apikey: supabaseKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ p_email: email.trim().toLowerCase() }),
-    },
-  );
+type SignupEmailCheckResponse = {
+  maySendSignupOtp?: boolean;
+  error?: string;
+};
 
-  if (!response.ok) {
-    throw new Error("We could not verify this email right now. Please try again.");
+async function maySendSignupOtp(email: string): Promise<boolean> {
+  if (typeof window === "undefined") {
+    throw new Error("Signup verification must be started in your browser.");
   }
 
-  return (await response.json()) === true;
+  const response = await fetch("/api/signup-email-check", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  });
+
+  let payload: SignupEmailCheckResponse | null = null;
+  try {
+    payload = (await response.json()) as SignupEmailCheckResponse;
+  } catch {
+    // The response status below still produces a safe user-facing error.
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.error || "We could not verify this email right now. Please try again.",
+    );
+  }
+
+  return payload?.maySendSignupOtp === true;
 }
 
 function createSupabaseClient() {
@@ -92,11 +102,7 @@ function createSupabaseClient() {
       credentials.options?.data?.signup_completed === false;
 
     if (isSignupOtp) {
-      const allowed = await maySendSignupOtp(
-        supabaseUrl,
-        supabasePublishableKey,
-        credentials.email,
-      );
+      const allowed = await maySendSignupOtp(credentials.email);
 
       if (!allowed) {
         throw new Error(
