@@ -96,10 +96,15 @@ function createSupabaseClient() {
 
   const originalSignInWithOtp = client.auth.signInWithOtp.bind(client.auth);
   client.auth.signInWithOtp = async (credentials) => {
+    const signupMetadata = credentials.options?.data;
+    const signupCompleted =
+      signupMetadata && "signup_completed" in signupMetadata
+        ? signupMetadata.signup_completed
+        : undefined;
     const isSignupOtp =
       "email" in credentials &&
       credentials.options?.shouldCreateUser === true &&
-      credentials.options?.data?.signup_completed === false;
+      signupCompleted === false;
 
     if (isSignupOtp) {
       const allowed = await maySendSignupOtp(credentials.email);
