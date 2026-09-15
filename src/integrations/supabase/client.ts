@@ -27,6 +27,31 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+async function maySendSignupOtp(
+  supabaseUrl: string,
+  supabaseKey: string,
+  email: string,
+): Promise<boolean> {
+  const response = await fetch(
+    `${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/can_send_signup_otp`,
+    {
+      method: "POST",
+      headers: {
+        apikey: supabaseKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ p_email: email.trim().toLowerCase() }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("We could not verify this email right now. Please try again.");
+  }
+
+  return (await response.json()) === true;
+}
+
 function createSupabaseClient() {
   const serverEnvironment: Record<string, string | undefined> =
     typeof process !== "undefined" ? process.env : {};
@@ -47,7 +72,7 @@ function createSupabaseClient() {
     throw new Error(message);
   }
 
-  return createClient<Database>(supabaseUrl, supabasePublishableKey, {
+  const client = createClient<Database>(supabaseUrl, supabasePublishableKey, {
     global: {
       fetch: createSupabaseFetch(supabasePublishableKey),
     },
@@ -58,6 +83,32 @@ function createSupabaseClient() {
       detectSessionInUrl: true,
     },
   });
+
+  const originalSignInWithOtp = client.auth.signInWithOtp.bind(client.auth);
+  client.auth.signInWithOtp = async (credentials) => {
+    const isSignupOtp =
+      "email" in credentials &&
+      credentials.options?.shouldCreateUser === true &&
+      credentials.options?.data?.signup_completed === false;
+
+    if (isSignupOtp) {
+      const allowed = await maySendSignupOtp(
+        supabaseUrl,
+        supabasePublishableKey,
+        credentials.email,
+      );
+
+      if (!allowed) {
+        throw new Error(
+          "This email already has an account. Sign in with your existing password.",
+        );
+      }
+    }
+
+    return originalSignInWithOtp(credentials);
+  };
+
+  return client;
 }
 
 let supabaseClient: ReturnType<typeof createSupabaseClient> | undefined;
