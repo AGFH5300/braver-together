@@ -70,9 +70,7 @@ function Decoder() {
       );
     } catch (caughtError) {
       console.error(caughtError);
-      setError(
-        "Couldn't analyze that text. Please try again in a moment.",
-      );
+      setError("Couldn't analyze that text. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -91,8 +89,7 @@ function Decoder() {
           </h1>
           <p className="mt-5 text-navy-deep/70 max-w-2xl mx-auto text-lg">
             Paste public Terms &amp; Conditions, app agreements, or another digital contract up to about{" "}
-            {MAX_CONTRACT_CHARACTERS.toLocaleString()} characters. We’ll translate the important
-            clauses into plain English. When AI is available, text is sent to Groq for processing. Remove personal or confidential information before submitting.
+            {MAX_CONTRACT_CHARACTERS.toLocaleString()} characters. The decoder identifies important clauses, ranks common risk patterns, and explains them in plain English. When the optional AI analysis is available, it adds a second model-based review. Remove personal or confidential information before submitting.
           </p>
         </div>
 
@@ -224,7 +221,7 @@ function Decoder() {
               )}
 
               <div className="mt-6 rounded-2xl bg-secondary/60 border border-border p-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Info className="h-3.5 w-3.5" /> {result.analysisMode === "ai" ? "AI analysis" : "Basic clause scan — advanced AI analysis is temporarily unavailable"}. Educational information, not legal advice.
+                <Info className="h-3.5 w-3.5" /> {result.analysisMode === "ai" ? "AI-assisted analysis with grounded contract excerpts" : "Local clause analysis using grounded contract excerpts"}. Educational information, not legal advice.
               </div>
             </div>
           )}
