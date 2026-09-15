@@ -508,7 +508,7 @@ function Thread({
   const [askingAi, setAskingAi] = useState(false);
   const [closing, setClosing] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const isTeen = conversation.teen_id === me.id;
   const aiAvailable = isTeen && conversation.advisor_id === null && conversation.ai_fallback_enabled && conversation.status === "open";
 
@@ -537,7 +537,9 @@ function Thread({
   }, [conversation.id]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   async function loadMessages() {
@@ -670,12 +672,11 @@ function Thread({
         </div>
       )}
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-secondary/30 p-4">
+      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-secondary/30 p-4">
         {messages.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">No messages yet.</div>}
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} mine={message.sender_id === me.id} />
         ))}
-        <div ref={endRef} />
       </div>
 
       {conversation.status === "closed" ? (
