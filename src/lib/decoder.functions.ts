@@ -18,15 +18,9 @@ const ContractAnalysisJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    summary: {
-      type: "string",
-      minLength: 1,
-      maxLength: 2000,
-    },
+    summary: { type: "string" },
     clauses: {
       type: "array",
-      minItems: 1,
-      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
@@ -35,21 +29,9 @@ const ContractAnalysisJsonSchema = {
             type: "string",
             enum: ["high", "medium", "low", "standard"],
           },
-          title: {
-            type: "string",
-            minLength: 1,
-            maxLength: 120,
-          },
-          quote: {
-            type: "string",
-            minLength: 1,
-            maxLength: 500,
-          },
-          plainEnglish: {
-            type: "string",
-            minLength: 1,
-            maxLength: 1200,
-          },
+          title: { type: "string" },
+          quote: { type: "string" },
+          plainEnglish: { type: "string" },
         },
         required: ["risk", "title", "quote", "plainEnglish"],
       },
