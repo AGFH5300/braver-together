@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
   ChevronDown,
@@ -358,6 +358,7 @@ function DesktopAccountControls({ access }: { access: AccountAccessHook }) {
 export function SiteLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const access = useAccountAccess();
+  const location = useLocation();
 
   return (
     <div className="flex min-h-screen flex-col bg-background" data-site-motion-root>
@@ -417,7 +418,11 @@ export function SiteLayout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main id="main-content" className="bt-main min-w-0 flex-1">{children}</main>
+      <main id="main-content" className="bt-main min-w-0 flex-1">
+        <div key={location.pathname} className="bt-vidolo-page">
+          {children}
+        </div>
+      </main>
 
       <footer className="bt-footer border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
