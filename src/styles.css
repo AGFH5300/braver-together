@@ -453,30 +453,47 @@
 }
 
 
-/* Route transitions: old page exits before navigation, new page enters after mount. */
-.bt-route-page {
-  min-height: 100%;
-  animation: bt-route-enter 430ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-  transform-origin: 50% 20%;
+/* Route transitions.
+   TanStack Router wraps navigation in document.startViewTransition() where supported,
+   so the browser animates snapshots of the actual old and new pages instead of delaying links. */
+.bt-site-header {
+  view-transition-name: bt-header;
 }
 
-.bt-route-page.bt-route-exit {
-  pointer-events: none;
-  animation: bt-route-exit 240ms cubic-bezier(0.4, 0, 0.6, 1) both !important;
+::view-transition-group(root) {
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-@keyframes bt-route-exit {
+::view-transition-old(root) {
+  animation: bt-page-snapshot-out 260ms cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+
+::view-transition-new(root) {
+  animation: bt-page-snapshot-in 520ms cubic-bezier(0.25, 0.46, 0.45, 0.94) 90ms both;
+}
+
+::view-transition-group(bt-header) {
+  animation-duration: 1ms;
+}
+
+::view-transition-old(bt-header),
+::view-transition-new(bt-header) {
+  animation: none;
+}
+
+@keyframes bt-page-snapshot-out {
   from {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
     opacity: 0;
-    transform: translate3d(0, -10px, 0) scale(0.992);
+    transform: translate3d(0, -12px, 0) scale(0.992);
   }
 }
 
-@keyframes bt-route-enter {
+@keyframes bt-page-snapshot-in {
   from {
     opacity: 0;
     transform: translate3d(0, 18px, 0) scale(0.996);
@@ -487,15 +504,10 @@
   }
 }
 
-html.bt-route-transitioning {
-  cursor: progress;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .bt-route-page,
-  .bt-route-page.bt-route-exit {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
   }
 }
