@@ -134,19 +134,17 @@
 /* BraverTogether motion system */
 :root {
   --bt-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --bt-motion-fast: 180ms;
-  --bt-motion-medium: 420ms;
-  --bt-motion-slow: 720ms;
+  --bt-motion-fast: 120ms;
+  --bt-motion-medium: 220ms;
+  --bt-motion-slow: 340ms;
 }
 
 @keyframes bt-page-enter {
   from {
-    opacity: 0.82;
-    transform: translateY(8px);
+    opacity: 0.94;
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -172,25 +170,22 @@
 }
 
 .bt-main.bt-page-enter {
-  animation: bt-page-enter 520ms var(--bt-motion-ease) both;
+  animation: bt-page-enter 160ms ease-out both;
 }
 
 .bt-reveal {
   opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.992);
-  filter: blur(3px);
+  transform: translate3d(0, 14px, 0);
   transition:
     opacity var(--bt-motion-slow) var(--bt-motion-ease),
-    transform var(--bt-motion-slow) var(--bt-motion-ease),
-    filter 620ms var(--bt-motion-ease);
+    transform var(--bt-motion-slow) var(--bt-motion-ease);
   transition-delay: var(--bt-reveal-delay, 0ms);
   will-change: opacity, transform, filter;
 }
 
 .bt-reveal.bt-reveal-visible {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-  filter: blur(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .bt-site-header {
@@ -412,7 +407,7 @@
 }
 
 .bt-hero-logo-card {
-  animation: bt-hero-logo-enter 820ms var(--bt-motion-ease) 120ms both;
+  animation: bt-hero-logo-enter 420ms var(--bt-motion-ease) 60ms both;
   transform-origin: center;
 }
 
@@ -437,11 +432,11 @@
 }
 
 .bt-hero-wordmark-braver {
-  animation: bt-wordmark-braver-in 720ms var(--bt-motion-ease) 700ms both;
+  animation: bt-wordmark-braver-in 380ms var(--bt-motion-ease) 220ms both;
 }
 
 .bt-hero-wordmark-together {
-  animation: bt-wordmark-together-in 720ms var(--bt-motion-ease) 840ms both;
+  animation: bt-wordmark-together-in 380ms var(--bt-motion-ease) 280ms both;
 }
 
 @media (max-width: 1023px) {
