@@ -419,7 +419,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       </header>
 
       <main id="main-content" className="bt-main min-w-0 flex-1">
-        <div key={location.pathname} className="bt-vidolo-page">
+        <div key={location.pathname} className="bt-route-page">
           {children}
         </div>
       </main>
