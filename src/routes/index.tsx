@@ -109,10 +109,10 @@ function Home() {
 
           <div className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/15 bg-white/15 md:grid-cols-4">
             {[
-              { value: "266", label: "Teaching hours" },
-              { value: "400", label: "People reached" },
-              { value: "23", label: "Volunteers" },
-              { value: "6", label: "Digital legal advisors" },
+              { value: "266+", label: "Teaching hours" },
+              { value: "400+", label: "People reached" },
+              { value: "23+", label: "Volunteers" },
+              { value: "6+", label: "Digital legal advisors" },
             ].map((stat) => (
               <div
                 key={stat.label}
