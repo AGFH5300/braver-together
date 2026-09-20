@@ -347,3 +347,118 @@
     transform: none !important;
   }
 }
+
+
+/* Homepage branded hero */
+@keyframes bt-hero-logo-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0) scale(0.9) rotate(-2deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0);
+  }
+}
+
+@keyframes bt-hero-logo-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0) rotate(0.7deg);
+  }
+}
+
+@keyframes bt-wordmark-braver-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-22px, 10px, 0);
+    filter: blur(6px);
+    letter-spacing: 0.02em;
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+    letter-spacing: -0.045em;
+  }
+}
+
+@keyframes bt-wordmark-together-in {
+  from {
+    opacity: 0;
+    transform: translate3d(22px, 10px, 0);
+    filter: blur(6px);
+    letter-spacing: 0.02em;
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+    letter-spacing: -0.045em;
+  }
+}
+
+@keyframes bt-hero-glow-breathe {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.08);
+  }
+}
+
+.bt-hero-logo-card {
+  animation: bt-hero-logo-enter 820ms var(--bt-motion-ease) 120ms both;
+  transform-origin: center;
+}
+
+.bt-hero-logo {
+  animation: bt-hero-logo-float 6.5s ease-in-out 1.05s infinite;
+  transform-origin: center;
+}
+
+.bt-hero-brand-glow {
+  animation: bt-hero-glow-breathe 5.5s ease-in-out infinite;
+}
+
+.bt-hero-wordmark {
+  overflow: hidden;
+  line-height: 1;
+  padding-block: 0.14em;
+}
+
+.bt-hero-wordmark-braver,
+.bt-hero-wordmark-together {
+  display: inline-block;
+}
+
+.bt-hero-wordmark-braver {
+  animation: bt-wordmark-braver-in 720ms var(--bt-motion-ease) 700ms both;
+}
+
+.bt-hero-wordmark-together {
+  animation: bt-wordmark-together-in 720ms var(--bt-motion-ease) 840ms both;
+}
+
+@media (max-width: 1023px) {
+  .bt-hero-brand {
+    max-width: 22rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-hero-logo-card,
+  .bt-hero-logo,
+  .bt-hero-brand-glow,
+  .bt-hero-wordmark-braver,
+  .bt-hero-wordmark-together {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
