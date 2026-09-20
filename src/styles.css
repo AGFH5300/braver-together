@@ -170,22 +170,16 @@
 }
 
 .bt-main.bt-page-enter {
-  animation: bt-page-enter 160ms ease-out both;
+  animation: none;
 }
 
-.bt-reveal {
-  opacity: 0;
-  transform: translate3d(0, 14px, 0);
-  transition:
-    opacity var(--bt-motion-slow) var(--bt-motion-ease),
-    transform var(--bt-motion-slow) var(--bt-motion-ease);
-  transition-delay: var(--bt-reveal-delay, 0ms);
-  will-change: opacity, transform, filter;
-}
-
+.bt-reveal,
 .bt-reveal.bt-reveal-visible {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  transform: none;
+  filter: none;
+  transition: none;
+  will-change: auto;
 }
 
 .bt-site-header {
