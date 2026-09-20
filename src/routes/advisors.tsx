@@ -136,6 +136,12 @@ function Advisors() {
             </div>
           </div>
         </div>
+
+        <div className="mt-4 rounded-2xl border border-border bg-secondary/45 px-5 py-4 sm:px-6">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            <strong className="font-semibold text-foreground">Educational disclaimer:</strong> BraverTogether is an educational resource. Our advisors are volunteers and are not acting as your lawyers or other licensed professionals. Information shared through this service is general educational guidance, not legal advice, and does not create a lawyer-client or other professional relationship. For advice about your specific situation, speak with a qualified professional and, where appropriate, a trusted adult.
+          </p>
+        </div>
       </Section>}
 
       <Section className="py-10">
