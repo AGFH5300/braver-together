@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 
-import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
+import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";\nimport { SiteMotion } from "@/components/SiteMotion";
 import {
   clearAccountAccessCache,
   useAccountAccess,
@@ -34,7 +34,7 @@ type AccountAccessHook = ReturnType<typeof useAccountAccess>;
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <div className={cn("relative flex h-9 w-9 items-center justify-center rounded-xl bg-mesh shadow-glow", className)}>
+    <div className={cn("bt-brand-mark relative flex h-9 w-9 items-center justify-center rounded-xl bg-mesh shadow-glow", className)}>
       <Heart className="h-4 w-4 fill-teal-soft/90 text-teal-soft" strokeWidth={2.5} />
     </div>
   );
@@ -358,9 +358,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   const access = useAccountAccess();
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background" data-site-motion-root>\n      <SiteMotion />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:bg-background focus:p-3">Skip to content</a>
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
+      <header className="bt-site-header sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 max-w-[1800px] items-center gap-3 px-4 py-2 sm:px-6">
           <Link to="/" className="group flex shrink-0 items-center gap-2.5">
             <BrandMark />
@@ -375,14 +375,14 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                className="bt-nav-link whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
                 activeProps={{ className: "text-foreground bg-secondary" }}
                 activeOptions={{ exact: item.to === "/" }}
               >
                 {item.label}
               </Link>
             ))}
-            <Link to="/decoder" className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">
+            <Link to="/decoder" className="bt-cta-link ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-mesh px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:opacity-90">
               Contract Decoder
             </Link>
           </nav>
@@ -414,9 +414,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
         )}
       </header>
 
-      <main id="main-content" className="min-w-0 flex-1">{children}</main>
+      <main id="main-content" className="bt-main min-w-0 flex-1">{children}</main>
 
-      <footer className="border-t border-border bg-mesh text-white">
+      <footer className="bt-footer border-t border-border bg-mesh text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
           <div>
             <div className="mb-3 flex items-center gap-2">
@@ -507,12 +507,12 @@ function FooterLinks({ access }: { access: AccountAccessHook }) {
 }
 
 export function Section({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24", className)}>{children}</section>;
+  return <section data-motion-section className={cn("bt-motion-section mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24", className)}>{children}</section>;
 }
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-teal/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal">
+    <span data-motion-reveal className="bt-eyebrow inline-flex items-center gap-2 rounded-full border border-teal/30 bg-teal/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal">
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal" />
       {children}
     </span>
