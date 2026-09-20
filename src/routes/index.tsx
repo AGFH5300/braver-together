@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, FileSearch, MessageCircle, Trophy, Users, Sparkles, ShieldCheck, Lock, Scale } from "lucide-react";
+import { ArrowRight, BookOpen, FileSearch, MessageCircle, Trophy, Users, Sparkles, ShieldCheck, Lock, Scale, Globe2 } from "lucide-react";
 import { SiteLayout, Section, Eyebrow } from "@/components/SiteLayout";
 
 export const Route = createFileRoute("/")({
@@ -158,6 +158,61 @@ function Home() {
           </p>
         </Section>
       </div>
+
+      {/* GLOBAL CHAPTERS */}
+      <Section className="py-16 sm:py-20">
+        <div className="relative overflow-hidden rounded-[2rem] border border-teal/20 bg-gradient-to-br from-navy-deep via-navy to-teal/90 p-8 text-white shadow-[0_28px_80px_-40px_rgba(13,53,73,0.65)] sm:p-10 lg:p-12">
+          <div className="absolute inset-0 grid-pattern opacity-15" />
+          <div className="absolute -right-16 -top-20 h-72 w-72 rounded-full bg-teal-soft/10 blur-3xl" />
+
+          <div className="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-teal-soft">
+                <Globe2 className="h-3.5 w-3.5" /> Take BraverTogether global
+              </div>
+              <h2 className="mt-5 max-w-3xl text-4xl font-bold leading-tight sm:text-5xl">
+                Start a BraverTogether chapter where you live.
+              </h2>
+              <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/75 sm:text-lg">
+                Bring digital legal literacy to your school, city or community. If you already have a few people interested, tell us about it and we’ll contact you about the next steps.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a
+                  href="/events#start-chapter"
+                  className="inline-flex items-center gap-2 rounded-full bg-teal-soft px-6 py-3 font-semibold text-navy-deep shadow-glow transition hover:brightness-105"
+                >
+                  <Globe2 className="h-4 w-4" /> Start a Global Chapter
+                </a>
+                <Link
+                  to="/events"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 font-semibold text-white backdrop-blur transition hover:bg-white/15"
+                >
+                  Explore Events <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {[
+                ["1", "Build interest", "Gather friends, classmates or volunteers who want to get involved."],
+                ["2", "Tell us about your community", "Share where you live, how many people are interested and any useful details."],
+                ["3", "We’ll contact you", "The BraverTogether team will review your interest and reach out about next steps."],
+              ].map(([number, title, text]) => (
+                <div key={number} className="flex gap-4 rounded-2xl border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/12 text-sm font-bold text-teal-soft">
+                    {number}
+                  </div>
+                  <div>
+                    <h3 className="font-display text-base font-bold text-white">{title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-white/65">{text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Section>
 
       {/* OFFERINGS */}
       <Section>
