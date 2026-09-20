@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -70,7 +70,7 @@ function EventsPage() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError("");
@@ -388,7 +388,7 @@ function Field({
   className = "",
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
