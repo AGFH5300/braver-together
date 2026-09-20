@@ -29,6 +29,7 @@ const nav = [
   { to: "/about", label: "About" },
   { to: "/resources", label: "Resources" },
   { to: "/competitions", label: "Competitions" },
+  { to: "/events", label: "Events" },
 ] as const;
 
 type AccountAccessHook = ReturnType<typeof useAccountAccess>;
