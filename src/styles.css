@@ -129,3 +129,221 @@
   background-image: radial-gradient(color-mix(in oklab, var(--teal) 22%, transparent) 1.2px, transparent 1.2px);
   background-size: 22px 22px;
 }
+
+
+/* BraverTogether motion system */
+:root {
+  --bt-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --bt-motion-fast: 180ms;
+  --bt-motion-medium: 420ms;
+  --bt-motion-slow: 720ms;
+}
+
+@keyframes bt-page-enter {
+  from {
+    opacity: 0.82;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bt-dot-drift {
+  0% {
+    background-position: 0 0;
+  }
+  50% {
+    background-position: 11px 8px;
+  }
+  100% {
+    background-position: 22px 22px;
+  }
+}
+
+@keyframes bt-eyebrow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--teal) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--teal) 8%, transparent);
+  }
+}
+
+.bt-main.bt-page-enter {
+  animation: bt-page-enter 520ms var(--bt-motion-ease) both;
+}
+
+.bt-reveal {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scale(0.992);
+  filter: blur(3px);
+  transition:
+    opacity var(--bt-motion-slow) var(--bt-motion-ease),
+    transform var(--bt-motion-slow) var(--bt-motion-ease),
+    filter 620ms var(--bt-motion-ease);
+  transition-delay: var(--bt-reveal-delay, 0ms);
+  will-change: opacity, transform, filter;
+}
+
+.bt-reveal.bt-reveal-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
+.bt-site-header {
+  transition:
+    background-color 280ms ease,
+    border-color 280ms ease,
+    box-shadow 280ms ease,
+    transform 280ms var(--bt-motion-ease);
+}
+
+.bt-site-header[data-scrolled="true"] {
+  border-color: color-mix(in oklab, var(--teal) 18%, var(--border));
+  background-color: color-mix(in oklab, var(--background) 92%, transparent);
+  box-shadow: 0 14px 40px -30px color-mix(in oklab, var(--navy-deep) 55%, transparent);
+}
+
+.bt-brand-mark {
+  transition:
+    transform 420ms var(--bt-motion-ease),
+    box-shadow 420ms ease;
+}
+
+.group:hover .bt-brand-mark {
+  transform: rotate(-5deg) scale(1.055);
+  box-shadow: 0 12px 32px -14px color-mix(in oklab, var(--teal) 60%, transparent);
+}
+
+.bt-nav-link {
+  position: relative;
+  isolation: isolate;
+}
+
+.bt-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.3rem;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--teal);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 300ms var(--bt-motion-ease);
+}
+
+.bt-nav-link:hover::after,
+.bt-nav-link[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+.bt-eyebrow {
+  transition:
+    transform 320ms var(--bt-motion-ease),
+    border-color 320ms ease,
+    background-color 320ms ease;
+}
+
+.bt-eyebrow:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--teal) 60%, transparent);
+  animation: bt-eyebrow-pulse 1.6s ease-in-out infinite;
+}
+
+.dot-pattern {
+  animation: bt-dot-drift 24s linear infinite;
+}
+
+.bt-interactive {
+  transition:
+    transform 340ms var(--bt-motion-ease),
+    box-shadow 340ms ease,
+    border-color 260ms ease,
+    background-color 260ms ease,
+    filter 260ms ease;
+  transform-origin: center;
+  backface-visibility: hidden;
+}
+
+.bt-cta-link {
+  transition:
+    transform 320ms var(--bt-motion-ease),
+    filter 260ms ease,
+    box-shadow 320ms ease;
+}
+
+.bt-cta-link:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 16px 38px -18px color-mix(in oklab, var(--teal) 70%, transparent);
+}
+
+.bt-footer {
+  position: relative;
+  overflow: hidden;
+}
+
+.bt-footer::before {
+  content: "";
+  position: absolute;
+  inset: -40% auto auto -10%;
+  width: 38rem;
+  height: 38rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--teal) 16%, transparent), transparent 68%);
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bt-interactive:hover {
+    transform: translateY(-2px);
+  }
+
+  main a.bt-interactive[class*="rounded-2xl"]:hover,
+  main a.bt-interactive[class*="rounded-3xl"]:hover {
+    transform: translateY(-5px) scale(1.006);
+    box-shadow: 0 22px 48px -28px color-mix(in oklab, var(--navy-deep) 48%, transparent);
+  }
+
+  .bt-interactive:active,
+  .bt-cta-link:active {
+    transform: translateY(0) scale(0.985);
+    transition-duration: 90ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-main.bt-page-enter,
+  .dot-pattern,
+  .bt-eyebrow:hover {
+    animation: none !important;
+  }
+
+  .bt-reveal,
+  .bt-reveal.bt-reveal-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+
+  .bt-interactive,
+  .bt-cta-link,
+  .bt-brand-mark,
+  .bt-site-header,
+  .bt-nav-link::after {
+    transition: none !important;
+  }
+
+  .group:hover .bt-brand-mark,
+  .bt-interactive:hover,
+  .bt-cta-link:hover,
+  .bt-eyebrow:hover {
+    transform: none !important;
+  }
+}
