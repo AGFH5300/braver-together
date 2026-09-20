@@ -360,7 +360,8 @@ export function SiteLayout({ children }: { children: ReactNode }) {
   const access = useAccountAccess();
 
   return (
-    <div className="flex min-h-screen flex-col bg-background" data-site-motion-root>\n      <SiteMotion />
+    <div className="flex min-h-screen flex-col bg-background" data-site-motion-root>
+      <SiteMotion />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:bg-background focus:p-3">Skip to content</a>
       <header className="bt-site-header sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 max-w-[1800px] items-center gap-3 px-4 py-2 sm:px-6">
