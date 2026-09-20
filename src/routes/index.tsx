@@ -79,6 +79,39 @@ function Home() {
         </div>
       </Section>
 
+      {/* IMPACT STATISTICS */}
+      <div className="border-y border-navy-deep/10 bg-mesh text-white">
+        <Section className="py-14 sm:py-18">
+          <div className="max-w-3xl">
+            <Eyebrow>Current impact</Eyebrow>
+            <h2 className="mt-4 text-3xl sm:text-4xl font-bold text-white">
+              Statistics from ongoing competitions and events
+            </h2>
+          </div>
+
+          <div className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/15 bg-white/15 md:grid-cols-4">
+            {[
+              { value: "266", label: "Teaching hours" },
+              { value: "400", label: "People reached" },
+              { value: "23", label: "Volunteers" },
+              { value: "6", label: "Digital legal advisors" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="group bg-navy-deep/55 px-5 py-7 backdrop-blur-sm transition hover:bg-navy-deep/35 sm:px-7 sm:py-9"
+              >
+                <div className="font-display text-4xl font-bold tracking-tight text-teal-soft sm:text-5xl">
+                  {stat.value}
+                </div>
+                <div className="mt-2 text-sm font-medium text-white/75 sm:text-base">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </div>
+
       {/* WHO IT'S FOR */}
       <div className="bg-secondary/50 border-y border-border">
         <Section>
