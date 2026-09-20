@@ -451,3 +451,66 @@
     filter: none !important;
   }
 }
+
+
+/* Native route transitions — content is never hidden while waiting for a route. */
+.bt-site-header {
+  view-transition-name: bt-header;
+}
+
+.bt-main {
+  view-transition-name: bt-content;
+}
+
+::view-transition-group(bt-header) {
+  animation-duration: 180ms;
+}
+
+::view-transition-old(bt-header),
+::view-transition-new(bt-header) {
+  animation: none;
+}
+
+::view-transition-group(bt-content) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--bt-motion-ease);
+}
+
+::view-transition-old(bt-content) {
+  animation: bt-route-out 220ms ease-out both;
+}
+
+::view-transition-new(bt-content) {
+  animation: bt-route-in 280ms var(--bt-motion-ease) both;
+}
+
+@keyframes bt-route-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0.35;
+    transform: translateY(-5px) scale(0.997);
+  }
+}
+
+@keyframes bt-route-in {
+  from {
+    opacity: 0;
+    transform: translateY(9px) scale(0.997);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(bt-content),
+  ::view-transition-old(bt-content),
+  ::view-transition-new(bt-content) {
+    animation-duration: 1ms !important;
+    animation: none !important;
+  }
+}
