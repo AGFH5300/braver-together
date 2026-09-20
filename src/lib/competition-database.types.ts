@@ -119,6 +119,19 @@ type AdvisorOnboardingIntentInsert = {
   user_id: string;
 };
 
+type ChapterInterestRow = {
+  id: string;
+  name: string;
+  email: string;
+  nationality: string;
+  location: string;
+  age: number;
+  interested_people: number;
+  notes: string | null;
+  status: string;
+  created_at: string;
+};
+
 type DirectoryRow = { id: string; linked_user_id: string | null; display_name: string; headline: string | null; bio: string | null; photo_url: string | null; sort_order: number; is_public: boolean; created_at: string; updated_at: string };
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"] & { status: string; resolution_note: string | null; reviewed_at: string | null; reviewed_by: string | null };
 type AdditionalTables = {
@@ -150,6 +163,11 @@ type AdditionalTables = {
     AdvisorOnboardingIntentRow,
     AdvisorOnboardingIntentInsert,
     Partial<AdvisorOnboardingIntentRow>
+  >;
+  chapter_interest_submissions: Table<
+    ChapterInterestRow,
+    Partial<Omit<ChapterInterestRow, "id" | "created_at" | "status">> & Pick<ChapterInterestRow, "name" | "email" | "nationality" | "location" | "age" | "interested_people">,
+    Partial<ChapterInterestRow>
   >;
 };
 
