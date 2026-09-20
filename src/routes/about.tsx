@@ -29,22 +29,16 @@ function About() {
       <Section>
         <div className="grid lg:grid-cols-[1fr_2fr] gap-12 items-start">
           <div className="lg:sticky lg:top-24">
-            <div className="group relative aspect-[4/5] overflow-hidden rounded-3xl border border-border bg-card shadow-card">
+            <div className="aspect-[4/5] overflow-hidden rounded-3xl border border-border bg-card shadow-card">
               <img
                 src="/tara-founder.webp"
                 alt="Tara Vishwakarthik, founder of BraverTogether"
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                width="480"
-                height="600"
+                className="h-full w-full object-cover"
+                width="819"
+                height="1024"
                 loading="eager"
                 decoding="async"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy-deep/95 via-navy-deep/20 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
-                <div className="mb-2 text-xs uppercase tracking-widest text-teal-soft">Founder</div>
-                <div className="font-display text-3xl font-bold">Tara<br />Vishwakarthik</div>
-                <div className="mt-2 text-sm text-white/75">16 · Law, Tech & Policy</div>
-              </div>
             </div>
           </div>
           <div>
