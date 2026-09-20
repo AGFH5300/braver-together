@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 
-import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";\nimport { SiteMotion } from "@/components/SiteMotion";
+import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
+import { SiteMotion } from "@/components/SiteMotion";
 import {
   clearAccountAccessCache,
   useAccountAccess,
