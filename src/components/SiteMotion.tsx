@@ -39,7 +39,12 @@ function delayFor(element: HTMLElement): number {
   if (!parent) return 0;
   const siblings = Array.from(parent.children).filter((child) => child instanceof HTMLElement);
   const index = Math.max(0, siblings.indexOf(element));
-  return Math.min(index, 5) * 55;
+  return Math.min(index, 4) * 20;
+}
+
+function isAboveFold(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+  return rect.top < window.innerHeight * 0.92 && rect.bottom > 0;
 }
 
 export function SiteMotion() {
@@ -88,6 +93,13 @@ export function SiteMotion() {
       if (element.dataset.btMotionBound === "true") return;
       element.dataset.btMotionBound = "true";
       element.classList.add("bt-reveal");
+
+      if (isAboveFold(element)) {
+        element.style.setProperty("--bt-reveal-delay", "0ms");
+        element.classList.add("bt-reveal-visible");
+        return;
+      }
+
       element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
       observer.observe(element);
     };
@@ -114,7 +126,7 @@ export function SiteMotion() {
 
     mutationObserver.observe(root, { childList: true, subtree: true });
 
-    const pageTimer = window.setTimeout(() => root.classList.remove("bt-page-enter"), 650);
+    const pageTimer = window.setTimeout(() => root.classList.remove("bt-page-enter"), 220);
 
     return () => {
       window.clearTimeout(pageTimer);
