@@ -453,49 +453,13 @@
 }
 
 
-/* Vidolo-style route transitions.
-   Matches Vidolo's public page-transition timing:
-   150ms entry delay, 20px upward reveal, 600ms cubic-bezier easing,
-   with a short 300ms fade on the outgoing page. */
-.bt-site-header {
-  view-transition-name: bt-header;
+/* Vidolo-style route transition copied from Vidolo's public source.
+   Every pathname mounts a fresh wrapper, so this always runs. */
+.bt-vidolo-page {
+  animation: bt-vidolo-page-in 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94) 150ms both;
 }
 
-.bt-main {
-  view-transition-name: bt-content;
-}
-
-::view-transition-group(bt-header) {
-  animation-duration: 1ms;
-}
-
-::view-transition-old(bt-header),
-::view-transition-new(bt-header) {
-  animation: none;
-}
-
-::view-transition-group(bt-content) {
-  animation-duration: 750ms;
-}
-
-::view-transition-old(bt-content) {
-  animation: bt-vidolo-route-out 300ms ease-in-out both;
-}
-
-::view-transition-new(bt-content) {
-  animation: bt-vidolo-route-in 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94) 150ms both;
-}
-
-@keyframes bt-vidolo-route-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes bt-vidolo-route-in {
+@keyframes bt-vidolo-page-in {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -507,9 +471,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(bt-content),
-  ::view-transition-old(bt-content),
-  ::view-transition-new(bt-content) {
+  .bt-vidolo-page {
     animation: none !important;
   }
 }
