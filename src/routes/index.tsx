@@ -29,7 +29,7 @@ function Home() {
       {/* HERO */}
       <div className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 dot-pattern opacity-60" />
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 pt-24 pb-32 sm:pt-32 sm:pb-40">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-4 pb-24 pt-20 sm:px-6 sm:pb-32 sm:pt-28 lg:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)] lg:gap-16 xl:gap-20">
           <div className="max-w-3xl">
             <Eyebrow>Digital Legal Literacy Initiative</Eyebrow>
             <h1 className="mt-6 font-display text-5xl sm:text-7xl font-bold leading-[1.02] text-navy-deep">
@@ -59,6 +59,24 @@ function Home() {
                   <span className="text-xs sm:text-sm font-semibold text-navy-deep">{b.label}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="bt-hero-brand relative mx-auto w-full max-w-[28rem]" data-motion-reveal>
+            <div className="bt-hero-brand-glow absolute inset-8 -z-10 rounded-full bg-teal/20 blur-3xl" />
+            <div className="bt-hero-logo-card overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_30px_80px_-32px_rgba(13,53,73,0.45)] backdrop-blur-xl sm:p-7">
+              <img
+                src="/bravertogether-logo.webp"
+                alt="BraverTogether logo"
+                className="bt-hero-logo mx-auto block h-auto w-full"
+                width="420"
+                height="417"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
+            <div className="bt-hero-wordmark mt-5 text-center font-display text-4xl font-bold tracking-[-0.045em] sm:text-5xl" aria-label="BraverTogether">
+              <span className="bt-hero-wordmark-braver text-navy-deep">Braver</span><span className="bt-hero-wordmark-together text-teal">Together</span>
             </div>
           </div>
         </div>
