@@ -42,6 +42,32 @@ function delayFor(element: HTMLElement): number {
   return Math.min(index, 5) * 55;
 }
 
+function reveal(element: HTMLElement) {
+  if (element.dataset.btMotionPlayed === "true") return;
+  element.dataset.btMotionPlayed = "true";
+
+  element.animate(
+    [
+      {
+        opacity: 0,
+        transform: "translate3d(0, 24px, 0) scale(0.992)",
+        filter: "blur(3px)",
+      },
+      {
+        opacity: 1,
+        transform: "translate3d(0, 0, 0) scale(1)",
+        filter: "blur(0)",
+      },
+    ],
+    {
+      duration: 720,
+      delay: delayFor(element),
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "none",
+    },
+  );
+}
+
 export function SiteMotion() {
   const location = useLocation();
 
@@ -58,40 +84,47 @@ export function SiteMotion() {
       else header.removeAttribute("data-scrolled");
     };
 
-    updateHeader();
-    window.addEventListener("scroll", updateHeader, { passive: true });
-
-    if (reducedMotion) {
-      return () => window.removeEventListener("scroll", updateHeader);
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const element = entry.target as HTMLElement;
-          element.classList.add("bt-reveal-visible");
-          observer.unobserve(element);
-        }
-      },
-      {
-        threshold: 0.08,
-        rootMargin: "0px 0px -7% 0px",
-      },
-    );
-
-    const bindReveal = (element: HTMLElement) => {
-      if (element.dataset.btMotionBound === "true") return;
-      element.dataset.btMotionBound = "true";
-      element.classList.add("bt-reveal");
-      element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
-      observer.observe(element);
-    };
-
     const bindInteractive = (element: HTMLElement) => {
       if (element.dataset.btInteractiveBound === "true") return;
       element.dataset.btInteractiveBound = "true";
       element.classList.add("bt-interactive");
+    };
+
+    const observer = reducedMotion
+      ? null
+      : new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              const element = entry.target as HTMLElement;
+              observer?.unobserve(element);
+              reveal(element);
+            }
+          },
+          {
+            threshold: 0.08,
+            rootMargin: "0px 0px -7% 0px",
+          },
+        );
+
+    const bindReveal = (element: HTMLElement) => {
+      if (element.dataset.btMotionBound === "true") return;
+      element.dataset.btMotionBound = "true";
+
+      // Remove any legacy hiding classes left by HMR or an older build.
+      element.classList.remove("bt-reveal", "bt-reveal-visible");
+      element.style.removeProperty("--bt-reveal-delay");
+
+      if (reducedMotion) {
+        element.dataset.btMotionPlayed = "true";
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const initiallyVisible = rect.bottom > 0 && rect.top < window.innerHeight * 0.96;
+
+      if (initiallyVisible) reveal(element);
+      else observer?.observe(element);
     };
 
     const bindAll = () => {
@@ -101,7 +134,10 @@ export function SiteMotion() {
       }
     };
 
-    bindAll();
+    updateHeader();
+    window.addEventListener("scroll", updateHeader, { passive: true });
+
+    const frame = window.requestAnimationFrame(bindAll);
 
     const mutationObserver = new MutationObserver((records) => {
       if (!records.some((record) => record.addedNodes.length > 0)) return;
@@ -111,9 +147,17 @@ export function SiteMotion() {
     mutationObserver.observe(root, { childList: true, subtree: true });
 
     return () => {
-      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
+
+      // Never leave content in an animated/hidden state during route teardown.
+      for (const element of collectRevealNodes(root)) {
+        element.getAnimations().forEach((animation) => animation.cancel());
+        element.classList.remove("bt-reveal", "bt-reveal-visible");
+        element.style.removeProperty("--bt-reveal-delay");
+      }
     };
   }, [location.pathname]);
 
