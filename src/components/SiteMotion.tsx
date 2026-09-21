@@ -1,13 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-const INTERACTIVE_SELECTOR = [
-  "main a[class*=\"rounded-\"]",
-  "main button[class*=\"rounded-\"]",
-  "header a[class*=\"rounded-\"]",
-  "header button[class*=\"rounded-\"]",
-].join(",");
-
 const REVEAL_SELECTOR = [
   "main h1",
   "[data-motion-reveal]",
@@ -19,6 +12,28 @@ const REVEAL_SELECTOR = [
   "main a[class*=\"rounded-2xl\"]",
 ].join(",");
 
+const INTERACTIVE_SELECTOR = [
+  "main a[class*=\"rounded-\"]",
+  "main button[class*=\"rounded-\"]",
+  "header a[class*=\"rounded-\"]",
+  "header button[class*=\"rounded-\"]",
+].join(",");
+
+function collectRevealNodes(root: HTMLElement): HTMLElement[] {
+  const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
+  const unique = Array.from(new Set(all)).filter((element) => !element.closest("[data-motion-skip]"));
+  const selected = new Set(unique);
+
+  return unique.filter((element) => {
+    let parent = element.parentElement;
+    while (parent && parent !== root) {
+      if (selected.has(parent) && !parent.classList.contains("grid")) return false;
+      parent = parent.parentElement;
+    }
+    return true;
+  });
+}
+
 function delayFor(element: HTMLElement): number {
   const parent = element.parentElement;
   if (!parent) return 0;
@@ -27,31 +42,15 @@ function delayFor(element: HTMLElement): number {
   return Math.min(index, 5) * 55;
 }
 
-function animateElement(element: HTMLElement, delay = 0) {
-  if (element.dataset.btScrollAnimated === "true") return;
-  element.dataset.btScrollAnimated = "true";
-
-  element.animate(
-    [
-      { opacity: 0, transform: "translate3d(0, 24px, 0)" },
-      { opacity: 1, transform: "translate3d(0, 0, 0)" },
-    ],
-    {
-      duration: 620,
-      delay,
-      easing: "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-      fill: "both",
-    },
-  );
-}
-
 export function SiteMotion() {
   const location = useLocation();
 
   useEffect(() => {
+    const root = document.getElementById("main-content");
+    if (!root) return;
+
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
-    const root = document.getElementById("main-content");
 
     const updateHeader = () => {
       if (!header) return;
@@ -59,74 +58,60 @@ export function SiteMotion() {
       else header.removeAttribute("data-scrolled");
     };
 
-    const bindInteractive = () => {
-      for (const element of document.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)) {
-        if (element.dataset.btInteractiveBound === "true") continue;
-        element.dataset.btInteractiveBound = "true";
-        element.classList.add("bt-interactive");
-      }
-    };
-
-    const observer = reducedMotion
-      ? null
-      : new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!entry.isIntersecting) continue;
-              const element = entry.target as HTMLElement;
-              observer?.unobserve(element);
-              animateElement(element, delayFor(element));
-            }
-          },
-          {
-            threshold: 0.08,
-            rootMargin: "0px 0px -7% 0px",
-          },
-        );
-
-    const bindReveal = () => {
-      if (!root) return;
-
-      for (const element of root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR)) {
-        if (element.dataset.btScrollMotionBound === "true") continue;
-        element.dataset.btScrollMotionBound = "true";
-
-        if (reducedMotion) {
-          element.dataset.btScrollAnimated = "true";
-          continue;
-        }
-
-        const rect = element.getBoundingClientRect();
-        const isInitiallyVisible = rect.bottom > 0 && rect.top < window.innerHeight * 0.96;
-
-        if (isInitiallyVisible) {
-          animateElement(element, delayFor(element));
-        } else {
-          observer?.observe(element);
-        }
-      }
-    };
-
     updateHeader();
-    bindInteractive();
-
-    const firstFrame = window.requestAnimationFrame(() => {
-      bindReveal();
-    });
-
     window.addEventListener("scroll", updateHeader, { passive: true });
+
+    if (reducedMotion) {
+      return () => window.removeEventListener("scroll", updateHeader);
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const element = entry.target as HTMLElement;
+          element.classList.add("bt-reveal-visible");
+          observer.unobserve(element);
+        }
+      },
+      {
+        threshold: 0.08,
+        rootMargin: "0px 0px -7% 0px",
+      },
+    );
+
+    const bindReveal = (element: HTMLElement) => {
+      if (element.dataset.btMotionBound === "true") return;
+      element.dataset.btMotionBound = "true";
+      element.classList.add("bt-reveal");
+      element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
+      observer.observe(element);
+    };
+
+    const bindInteractive = (element: HTMLElement) => {
+      if (element.dataset.btInteractiveBound === "true") return;
+      element.dataset.btInteractiveBound = "true";
+      element.classList.add("bt-interactive");
+    };
+
+    const bindAll = () => {
+      for (const element of collectRevealNodes(root)) bindReveal(element);
+      for (const element of document.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)) {
+        bindInteractive(element);
+      }
+    };
+
+    bindAll();
 
     const mutationObserver = new MutationObserver((records) => {
       if (!records.some((record) => record.addedNodes.length > 0)) return;
-      bindInteractive();
-      bindReveal();
+      bindAll();
     });
 
-    if (root) mutationObserver.observe(root, { childList: true, subtree: true });
+    mutationObserver.observe(root, { childList: true, subtree: true });
 
     return () => {
-      window.cancelAnimationFrame(firstFrame);
-      observer?.disconnect();
+      observer.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
     };
