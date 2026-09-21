@@ -42,12 +42,12 @@ function BrandMark({ className }: { className?: string }) {
       )}
     >
       <img
-        src="/bravertogether-logo.webp"
+        src="/bravertogether-logo.webp?v=20260921-2"
         alt=""
         aria-hidden="true"
         className="h-full w-full object-contain"
-        width="800"
-        height="800"
+        width="420"
+        height="417"
         loading="eager"
         decoding="async"
       />
