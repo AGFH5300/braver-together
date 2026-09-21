@@ -39,29 +39,38 @@ const commentCache = new Map<string, CommentCacheEntry>();
 const COMMENT_TTL_MS = 60 * 60 * 1000;
 
 export const getResourceLibrary = createServerFn({ method: "GET" }).handler(async () => {
-  const [categoriesResult, videosResult] = await Promise.all([
-    supabase
-      .from("resource_categories")
-      .select("id, label, description, sort_order")
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("resource_videos")
-      .select(
-        "id, youtube_video_id, title, description, category_id, duration_text, thumbnail_url, comments_enabled, sort_order",
-      )
-      .eq("is_published", true)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: false }),
-  ]);
+  try {
+    const [categoriesResult, videosResult] = await Promise.all([
+      supabase
+        .from("resource_categories")
+        .select("id, label, description, sort_order")
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("resource_videos")
+        .select(
+          "id, youtube_video_id, title, description, category_id, duration_text, thumbnail_url, comments_enabled, sort_order",
+        )
+        .eq("is_published", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false }),
+    ]);
 
-  if (categoriesResult.error) throw new Error(categoriesResult.error.message);
-  if (videosResult.error) throw new Error(videosResult.error.message);
+    if (categoriesResult.error) throw new Error(categoriesResult.error.message);
+    if (videosResult.error) throw new Error(videosResult.error.message);
 
-  return {
-    categories: (categoriesResult.data ?? []) as ResourceCategory[],
-    videos: (videosResult.data ?? []) as ResourceVideo[],
-    commentsConfigured: Boolean(process.env.YOUTUBE_API_KEY),
-  };
+    return {
+      categories: (categoriesResult.data ?? []) as ResourceCategory[],
+      videos: (videosResult.data ?? []) as ResourceVideo[],
+      commentsConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    };
+  } catch (error) {
+    console.warn("[Resources] Resource library unavailable; rendering the fallback state.", error);
+    return {
+      categories: [] as ResourceCategory[],
+      videos: [] as ResourceVideo[],
+      commentsConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    };
+  }
 });
 
 const CommentsInput = z.object({
