@@ -90,7 +90,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     scripts: [{ type: "application/ld+json", children: JSON.stringify({ "@context": "https://schema.org", "@graph": [{ "@type": "Organization", "@id": "https://bravertogether.site/#organization", name: "BraverTogether", url: "https://bravertogether.site", description: "Digital legal literacy for young people" }, { "@type": "WebSite", name: "BraverTogether — Digital Legal Literacy", url: "https://bravertogether.site", publisher: { "@id": "https://bravertogether.site/#organization" } }] }) }],
     links: [
-      { rel: "icon", type: "image/webp", href: "/bravertogether-logo.webp" },
+      { rel: "icon", type: "image/webp", href: "/bravertogether-logo.webp?v=20260921-2" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
