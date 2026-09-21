@@ -62,15 +62,15 @@ function Home() {
             </div>
           </div>
 
-          <div className="bt-hero-brand relative mx-auto w-full max-w-[28rem]" data-motion-reveal>
+          <div className="bt-hero-brand relative mx-auto w-full max-w-[30rem]" data-motion-reveal>
             <div className="bt-hero-brand-glow absolute inset-8 -z-10 rounded-full bg-teal/20 blur-3xl" />
-            <div className="bt-hero-logo-card overflow-hidden rounded-[2rem] border border-white/80 bg-white/75 p-5 shadow-[0_30px_80px_-32px_rgba(13,53,73,0.45)] backdrop-blur-xl sm:p-7">
+            <div className="bt-hero-logo-card rounded-[2rem] border border-white/80 bg-white/80 p-3 shadow-[0_30px_80px_-32px_rgba(13,53,73,0.45)] backdrop-blur-xl sm:p-4">
               <img
                 src="/bravertogether-logo.webp"
                 alt="BraverTogether logo"
-                className="bt-hero-logo mx-auto block h-auto w-full"
-                width="420"
-                height="417"
+                className="bt-hero-logo mx-auto block aspect-square h-auto w-full object-contain"
+                width="800"
+                height="800"
                 loading="eager"
                 decoding="async"
               />
