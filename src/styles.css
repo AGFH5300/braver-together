@@ -477,6 +477,49 @@
 }
 
 
+
+/* Immediate navigation feedback while the next route resolves. */
+.bt-main {
+  transition:
+    opacity 140ms ease,
+    transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    filter 180ms ease;
+}
+
+.bt-main.bt-route-pending {
+  opacity: 0.9;
+  transform: translate3d(0, -3px, 0) scale(0.998);
+  filter: saturate(0.96);
+}
+
+html.bt-route-pending::after {
+  content: "";
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 68%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--teal), var(--navy));
+  animation: bt-route-progress 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  pointer-events: none;
+}
+
+@keyframes bt-route-progress {
+  from {
+    opacity: 0;
+    transform: scaleX(0.05);
+  }
+  12% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
 /* Route transitions.
    TanStack Router wraps navigation in document.startViewTransition() where supported,
    so the browser animates snapshots of the actual old and new pages instead of delaying links. */
