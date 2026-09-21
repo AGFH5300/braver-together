@@ -31,7 +31,7 @@ function About() {
           <div className="lg:sticky lg:top-24">
             <div className="aspect-[4/5] overflow-hidden rounded-3xl border border-border bg-card shadow-card">
               <img
-                src="/tara-founder.webp"
+                src="/tara-founder.webp?v=20260921-2"
                 alt="Tara Vishwakarthik, founder of BraverTogether"
                 className="h-full w-full object-cover"
                 width="819"
