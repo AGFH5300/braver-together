@@ -12,10 +12,16 @@ let pendingUserRequest: Promise<User | null> | null = null;
 function loadCurrentUser(): Promise<User | null> {
   if (cachedUser !== undefined) return Promise.resolve(cachedUser);
   if (!pendingUserRequest) {
-    pendingUserRequest = supabase.auth.getUser().then(({ data }) => {
-      cachedUser = completedAccountUser(data.user);
-      return cachedUser;
-    });
+    pendingUserRequest = supabase.auth.getUser()
+      .then(({ data }) => {
+        cachedUser = completedAccountUser(data.user);
+        return cachedUser;
+      })
+      .catch((error) => {
+        console.warn("[Auth] Could not verify the current user. Continuing signed out for now.", error);
+        pendingUserRequest = null;
+        return null;
+      });
   }
   return pendingUserRequest;
 }
