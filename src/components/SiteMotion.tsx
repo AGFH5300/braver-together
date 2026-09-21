@@ -22,6 +22,8 @@ const INTERACTIVE_SELECTOR = [
 const useBrowserLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+let previousPathname: string | null = null;
+
 function collectRevealNodes(root: HTMLElement): HTMLElement[] {
   const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
   const unique = Array.from(new Set(all)).filter(
@@ -50,19 +52,23 @@ function delayFor(element: HTMLElement): number {
   return Math.min(index, 5) * 55;
 }
 
+function prepReveal(element: HTMLElement) {
+  element.classList.add("bt-reveal-prep");
+}
+
 function playReveal(element: HTMLElement) {
   if (element.dataset.btMotionPlayed === "true") return;
 
   element.dataset.btMotionPlayed = "true";
   element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
+  element.classList.add("bt-reveal-prep");
   element.classList.remove("bt-reveal-run");
 
-  // Restart cleanly in dev/HMR without ever leaving a hidden resting state.
   void element.offsetWidth;
   element.classList.add("bt-reveal-run");
 
   const finish = () => {
-    element.classList.remove("bt-reveal-run");
+    element.classList.remove("bt-reveal-prep", "bt-reveal-run");
     element.style.removeProperty("--bt-reveal-delay");
   };
 
@@ -81,9 +87,11 @@ export function SiteMotion() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
+    const isRouteNavigation =
+      previousPathname !== null && previousPathname !== location.pathname;
 
-    // Track only nodes owned by THIS route effect. The previous route must
-    // never clean up or cancel animation on the newly mounted route.
+    previousPathname = location.pathname;
+
     const ownedNodes = new Set<HTMLElement>();
 
     const updateHeader = () => {
@@ -111,8 +119,6 @@ export function SiteMotion() {
           },
           {
             threshold: 0.08,
-            // Trigger only once the element is visibly inside the viewport,
-            // so the user can actually watch the reveal happen.
             rootMargin: "0px 0px -14% 0px",
           },
         );
@@ -123,10 +129,10 @@ export function SiteMotion() {
       element.dataset.btMotionBound = "true";
       ownedNodes.add(element);
 
-      // Clear stale classes from old hot-reload builds only on this node.
       element.classList.remove(
         "bt-reveal",
         "bt-reveal-visible",
+        "bt-reveal-prep",
         "bt-reveal-run",
       );
       element.style.removeProperty("--bt-reveal-delay");
@@ -141,11 +147,19 @@ export function SiteMotion() {
         rect.bottom > 0 && rect.top < window.innerHeight;
 
       if (initiallyVisible) {
-        // Layout effect means this class is attached before the first live
-        // paint. On route navigation it continues underneath the 320ms
-        // snapshot transition, then remains visible afterwards.
-        playReveal(element);
+        if (isRouteNavigation) {
+          // The route transition already animates the visible page entrance.
+          // Mark it complete so it never "replays" when the user scrolls.
+          element.dataset.btMotionPlayed = "true";
+        } else {
+          // Cold load: prep + animate before the first paint.
+          prepReveal(element);
+          playReveal(element);
+        }
       } else {
+        // Critical: off-screen content is placed in its start state NOW,
+        // before the user can scroll to it. It can never appear static first.
+        prepReveal(element);
         observer?.observe(element);
       }
     };
@@ -176,13 +190,12 @@ export function SiteMotion() {
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
 
-      // Only clean up nodes this exact route effect bound. Never query the
-      // shared root here; by cleanup time it may already contain the next page.
       for (const element of ownedNodes) {
         observer?.unobserve(element);
         element.classList.remove(
           "bt-reveal",
           "bt-reveal-visible",
+          "bt-reveal-prep",
           "bt-reveal-run",
         );
         element.style.removeProperty("--bt-reveal-delay");
