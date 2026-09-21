@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 
 const REVEAL_SELECTOR = [
   "main h1",
@@ -18,6 +18,8 @@ const INTERACTIVE_SELECTOR = [
   "header a[class*=\"rounded-\"]",
   "header button[class*=\"rounded-\"]",
 ].join(",");
+
+let previousPathname: string | null = null;
 
 function collectRevealNodes(root: HTMLElement): HTMLElement[] {
   const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
@@ -52,7 +54,6 @@ function playReveal(element: HTMLElement) {
   element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
   element.classList.remove("bt-reveal-run");
 
-  // Force a fresh animation timeline even after Vite HMR.
   void element.offsetWidth;
   element.classList.add("bt-reveal-run");
 
@@ -65,13 +66,35 @@ function playReveal(element: HTMLElement) {
   element.addEventListener("animationcancel", finish, { once: true });
 }
 
-const useBrowserLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+function isInternalNavigation(anchor: HTMLAnchorElement, event: MouseEvent) {
+  if (event.defaultPrevented || event.button !== 0) return false;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+  if (anchor.target && anchor.target !== "_self") return false;
+  if (anchor.hasAttribute("download")) return false;
+
+  const rawHref = anchor.getAttribute("href");
+  if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) {
+    return false;
+  }
+
+  const destination = new URL(anchor.href, window.location.href);
+  const current = new URL(window.location.href);
+
+  if (destination.origin !== current.origin) return false;
+  if (
+    destination.pathname === current.pathname &&
+    destination.search === current.search
+  ) {
+    return false;
+  }
+
+  return true;
+}
 
 export function SiteMotion() {
   const location = useLocation();
 
-  useBrowserLayoutEffect(() => {
+  useEffect(() => {
     const root = document.getElementById("main-content");
     if (!root) return;
 
@@ -79,6 +102,25 @@ export function SiteMotion() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
+    const isNavigation =
+      previousPathname !== null && previousPathname !== location.pathname;
+    previousPathname = location.pathname;
+
+    // A new route should never inherit motion bookkeeping from an HMR update
+    // or a preserved DOM node.
+    for (const element of collectRevealNodes(root)) {
+      delete element.dataset.btMotionBound;
+      delete element.dataset.btMotionPlayed;
+      element.classList.remove(
+        "bt-reveal",
+        "bt-reveal-visible",
+        "bt-reveal-run",
+      );
+      element.style.removeProperty("--bt-reveal-delay");
+    }
+
+    root.classList.remove("bt-route-pending");
+    document.documentElement.classList.remove("bt-route-pending");
 
     const updateHeader = () => {
       if (!header) return;
@@ -109,33 +151,32 @@ export function SiteMotion() {
           },
         );
 
-    const bindReveal = (element: HTMLElement) => {
-      if (element.dataset.btMotionBound === "true") return;
-      element.dataset.btMotionBound = "true";
+    const bindBelowFold = () => {
+      for (const element of collectRevealNodes(root)) {
+        if (element.dataset.btMotionBound === "true") continue;
+        element.dataset.btMotionBound = "true";
 
-      // Clean up any stale classes left behind by older dev builds/HMR.
-      element.classList.remove(
-        "bt-reveal",
-        "bt-reveal-visible",
-        "bt-reveal-run",
-      );
-      element.style.removeProperty("--bt-reveal-delay");
+        if (reducedMotion) {
+          element.dataset.btMotionPlayed = "true";
+          continue;
+        }
 
-      if (reducedMotion) {
-        element.dataset.btMotionPlayed = "true";
-        return;
+        const rect = element.getBoundingClientRect();
+        if (rect.bottom > 0 && rect.top < window.innerHeight) continue;
+        observer?.observe(element);
       }
-
-      const rect = element.getBoundingClientRect();
-      const initiallyVisible =
-        rect.bottom > 0 && rect.top < window.innerHeight;
-
-      if (initiallyVisible) playReveal(element);
-      else observer?.observe(element);
     };
 
-    const bindAll = () => {
-      for (const element of collectRevealNodes(root)) bindReveal(element);
+    const playVisible = () => {
+      if (reducedMotion) return;
+      for (const element of collectRevealNodes(root)) {
+        const rect = element.getBoundingClientRect();
+        if (rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
+        playReveal(element);
+      }
+    };
+
+    const bindInteractiveAll = () => {
       for (const element of document.querySelectorAll<HTMLElement>(
         INTERACTIVE_SELECTOR,
       )) {
@@ -143,26 +184,61 @@ export function SiteMotion() {
       }
     };
 
-    updateHeader();
-    window.addEventListener("scroll", updateHeader, { passive: true });
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor || !isInternalNavigation(anchor, event)) return;
 
-    // Bind immediately during layout so initially visible elements begin
-    // their entrance animation before the browser paints the page.
-    bindAll();
+      // Do not intercept navigation. This only gives instant visual feedback
+      // while the router resolves/preloads the next route.
+      root.classList.add("bt-route-pending");
+      document.documentElement.classList.add("bt-route-pending");
+    };
+
+    updateHeader();
+    bindInteractiveAll();
+    bindBelowFold();
+
+    // View-transition snapshots sit above the live DOM while a route changes.
+    // Start the visible-page reveals just before that snapshot finishes, so
+    // the user actually sees the entrance motion instead of it completing
+    // invisibly underneath the snapshot.
+    const supportsViewTransitions =
+      typeof document !== "undefined" && "startViewTransition" in document;
+    const revealDelay =
+      isNavigation && supportsViewTransitions ? 285 : 24;
+    const revealTimer = window.setTimeout(playVisible, revealDelay);
+
+    window.addEventListener("scroll", updateHeader, { passive: true });
+    document.addEventListener("click", onDocumentClick, true);
 
     const mutationObserver = new MutationObserver((records) => {
       if (!records.some((record) => record.addedNodes.length > 0)) return;
-      bindAll();
+      bindInteractiveAll();
+      bindBelowFold();
     });
 
     mutationObserver.observe(root, { childList: true, subtree: true });
 
+    // If a navigation fails or stalls, never leave the old page looking
+    // permanently faded.
+    const pendingSafetyTimer = window.setTimeout(() => {
+      root.classList.remove("bt-route-pending");
+      document.documentElement.classList.remove("bt-route-pending");
+    }, 1_500);
+
     return () => {
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(pendingSafetyTimer);
       observer?.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
+      document.removeEventListener("click", onDocumentClick, true);
 
-      // Route teardown must always leave the DOM fully visible.
+      root.classList.remove("bt-route-pending");
+      document.documentElement.classList.remove("bt-route-pending");
+
       for (const element of collectRevealNodes(root)) {
         element.classList.remove(
           "bt-reveal",
