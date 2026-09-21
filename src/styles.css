@@ -175,22 +175,13 @@
   animation: bt-page-enter 520ms var(--bt-motion-ease) both;
 }
 
-.bt-reveal {
-  opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.992);
-  filter: blur(3px);
-  transition:
-    opacity var(--bt-motion-slow) var(--bt-motion-ease),
-    transform var(--bt-motion-slow) var(--bt-motion-ease),
-    filter 620ms var(--bt-motion-ease);
-  transition-delay: var(--bt-reveal-delay, 0ms);
-  will-change: opacity, transform, filter;
-}
-
+.bt-reveal,
 .bt-reveal.bt-reveal-visible {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-  filter: blur(0);
+  transform: none;
+  filter: none;
+  transition: none;
+  will-change: auto;
 }
 
 .bt-site-header {
