@@ -21,7 +21,9 @@ const INTERACTIVE_SELECTOR = [
 
 function collectRevealNodes(root: HTMLElement): HTMLElement[] {
   const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
-  const unique = Array.from(new Set(all)).filter((element) => !element.closest("[data-motion-skip]"));
+  const unique = Array.from(new Set(all)).filter(
+    (element) => !element.closest("[data-motion-skip]"),
+  );
   const selected = new Set(unique);
 
   return unique.filter((element) => {
@@ -37,35 +39,30 @@ function collectRevealNodes(root: HTMLElement): HTMLElement[] {
 function delayFor(element: HTMLElement): number {
   const parent = element.parentElement;
   if (!parent) return 0;
-  const siblings = Array.from(parent.children).filter((child) => child instanceof HTMLElement);
+  const siblings = Array.from(parent.children).filter(
+    (child) => child instanceof HTMLElement,
+  );
   const index = Math.max(0, siblings.indexOf(element));
   return Math.min(index, 5) * 55;
 }
 
-function reveal(element: HTMLElement) {
+function playReveal(element: HTMLElement) {
   if (element.dataset.btMotionPlayed === "true") return;
   element.dataset.btMotionPlayed = "true";
+  element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
+  element.classList.remove("bt-reveal-run");
 
-  element.animate(
-    [
-      {
-        opacity: 0,
-        transform: "translate3d(0, 24px, 0) scale(0.992)",
-        filter: "blur(3px)",
-      },
-      {
-        opacity: 1,
-        transform: "translate3d(0, 0, 0) scale(1)",
-        filter: "blur(0)",
-      },
-    ],
-    {
-      duration: 720,
-      delay: delayFor(element),
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      fill: "none",
-    },
-  );
+  // Force a fresh animation timeline even after Vite HMR.
+  void element.offsetWidth;
+  element.classList.add("bt-reveal-run");
+
+  const finish = () => {
+    element.classList.remove("bt-reveal-run");
+    element.style.removeProperty("--bt-reveal-delay");
+  };
+
+  element.addEventListener("animationend", finish, { once: true });
+  element.addEventListener("animationcancel", finish, { once: true });
 }
 
 export function SiteMotion() {
@@ -75,7 +72,9 @@ export function SiteMotion() {
     const root = document.getElementById("main-content");
     if (!root) return;
 
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
 
     const updateHeader = () => {
@@ -98,7 +97,7 @@ export function SiteMotion() {
               if (!entry.isIntersecting) continue;
               const element = entry.target as HTMLElement;
               observer?.unobserve(element);
-              reveal(element);
+              playReveal(element);
             }
           },
           {
@@ -111,8 +110,12 @@ export function SiteMotion() {
       if (element.dataset.btMotionBound === "true") return;
       element.dataset.btMotionBound = "true";
 
-      // Remove any legacy hiding classes left by HMR or an older build.
-      element.classList.remove("bt-reveal", "bt-reveal-visible");
+      // Clean up any stale classes left behind by older dev builds/HMR.
+      element.classList.remove(
+        "bt-reveal",
+        "bt-reveal-visible",
+        "bt-reveal-run",
+      );
       element.style.removeProperty("--bt-reveal-delay");
 
       if (reducedMotion) {
@@ -121,15 +124,18 @@ export function SiteMotion() {
       }
 
       const rect = element.getBoundingClientRect();
-      const initiallyVisible = rect.bottom > 0 && rect.top < window.innerHeight * 0.96;
+      const initiallyVisible =
+        rect.bottom > 0 && rect.top < window.innerHeight * 0.96;
 
-      if (initiallyVisible) reveal(element);
+      if (initiallyVisible) playReveal(element);
       else observer?.observe(element);
     };
 
     const bindAll = () => {
       for (const element of collectRevealNodes(root)) bindReveal(element);
-      for (const element of document.querySelectorAll<HTMLElement>(INTERACTIVE_SELECTOR)) {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        INTERACTIVE_SELECTOR,
+      )) {
         bindInteractive(element);
       }
     };
@@ -152,10 +158,13 @@ export function SiteMotion() {
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
 
-      // Never leave content in an animated/hidden state during route teardown.
+      // Route teardown must always leave the DOM fully visible.
       for (const element of collectRevealNodes(root)) {
-        element.getAnimations().forEach((animation) => animation.cancel());
-        element.classList.remove("bt-reveal", "bt-reveal-visible");
+        element.classList.remove(
+          "bt-reveal",
+          "bt-reveal-visible",
+          "bt-reveal-run",
+        );
         element.style.removeProperty("--bt-reveal-delay");
       }
     };
