@@ -184,6 +184,13 @@
   will-change: auto;
 }
 
+.bt-reveal-prep {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scale(0.992);
+  filter: blur(3px);
+  will-change: opacity, transform, filter;
+}
+
 @keyframes bt-reveal-in {
   from {
     opacity: 0;
@@ -197,9 +204,8 @@
   }
 }
 
-.bt-reveal-run {
+.bt-reveal-prep.bt-reveal-run {
   animation: bt-reveal-in 720ms var(--bt-motion-ease) var(--bt-reveal-delay, 0ms) both;
-  will-change: opacity, transform, filter;
 }
 
 .bt-site-header {
@@ -327,6 +333,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bt-reveal-prep,
+  .bt-reveal-prep.bt-reveal-run {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    animation: none !important;
+  }
+
   .bt-main.bt-page-enter,
   .dot-pattern,
   .bt-eyebrow:hover {
