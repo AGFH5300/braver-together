@@ -2,7 +2,6 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   CalendarDays,
   ChevronDown,
-  Heart,
   Inbox,
   LogIn,
   LogOut,
@@ -36,8 +35,22 @@ type AccountAccessHook = ReturnType<typeof useAccountAccess>;
 
 function BrandMark({ className }: { className?: string }) {
   return (
-    <div className={cn("bt-brand-mark relative flex h-9 w-9 items-center justify-center rounded-xl bg-mesh shadow-glow", className)}>
-      <Heart className="h-4 w-4 fill-teal-soft/90 text-teal-soft" strokeWidth={2.5} />
+    <div
+      className={cn(
+        "bt-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white shadow-glow",
+        className,
+      )}
+    >
+      <img
+        src="/bravertogether-logo.webp"
+        alt=""
+        aria-hidden="true"
+        className="h-full w-full object-contain"
+        width="800"
+        height="800"
+        loading="eager"
+        decoding="async"
+      />
     </div>
   );
 }
