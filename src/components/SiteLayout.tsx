@@ -37,17 +37,17 @@ function BrandMark({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "bt-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white shadow-glow",
+        "bt-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/70 bg-white shadow-glow",
         className,
       )}
     >
       <img
-        src="/bravertogether-logo.webp?v=20260921-2"
+        src="/bravertogether-logo.webp?v=20260921-3"
         alt=""
         aria-hidden="true"
-        className="h-full w-full object-contain"
-        width="420"
-        height="417"
+        className="h-[88%] w-[88%] object-contain"
+        width="512"
+        height="512"
         loading="eager"
         decoding="async"
       />
