@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, type ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
@@ -120,10 +120,42 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function InitialScrollGuard() {
+  useLayoutEffect(() => {
+    if (!("scrollRestoration" in window.history)) return;
+
+    const previous = window.history.scrollRestoration;
+    let restoreTimer: number | undefined;
+
+    const release = () => {
+      restoreTimer = window.setTimeout(() => {
+        window.history.scrollRestoration = previous;
+      }, 2000);
+    };
+
+    window.history.scrollRestoration = "manual";
+
+    if (document.readyState === "complete") {
+      release();
+    } else {
+      window.addEventListener("load", release, { once: true });
+    }
+
+    return () => {
+      if (restoreTimer) window.clearTimeout(restoreTimer);
+      window.removeEventListener("load", release);
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+      <InitialScrollGuard />
       <Outlet />
       <Toaster richColors closeButton position="top-right" />
     </QueryClientProvider>
