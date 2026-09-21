@@ -110,10 +110,10 @@ export function SiteMotion() {
             }
           },
           {
-            threshold: 0.01,
-            // Start just before the element enters the viewport, avoiding a
-            // visible "normal state -> animate again" jump while scrolling.
-            rootMargin: "0px 0px 96px 0px",
+            threshold: 0.08,
+            // Trigger only once the element is visibly inside the viewport,
+            // so the user can actually watch the reveal happen.
+            rootMargin: "0px 0px -14% 0px",
           },
         );
 
