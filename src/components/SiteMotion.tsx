@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 const REVEAL_SELECTOR = [
   "main h1",
@@ -65,10 +65,13 @@ function playReveal(element: HTMLElement) {
   element.addEventListener("animationcancel", finish, { once: true });
 }
 
+const useBrowserLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function SiteMotion() {
   const location = useLocation();
 
-  useEffect(() => {
+  useBrowserLayoutEffect(() => {
     const root = document.getElementById("main-content");
     if (!root) return;
 
@@ -125,7 +128,7 @@ export function SiteMotion() {
 
       const rect = element.getBoundingClientRect();
       const initiallyVisible =
-        rect.bottom > 0 && rect.top < window.innerHeight * 0.96;
+        rect.bottom > 0 && rect.top < window.innerHeight;
 
       if (initiallyVisible) playReveal(element);
       else observer?.observe(element);
@@ -143,7 +146,9 @@ export function SiteMotion() {
     updateHeader();
     window.addEventListener("scroll", updateHeader, { passive: true });
 
-    const frame = window.requestAnimationFrame(bindAll);
+    // Bind immediately during layout so initially visible elements begin
+    // their entrance animation before the browser paints the page.
+    bindAll();
 
     const mutationObserver = new MutationObserver((records) => {
       if (!records.some((record) => record.addedNodes.length > 0)) return;
@@ -153,7 +158,6 @@ export function SiteMotion() {
     mutationObserver.observe(root, { childList: true, subtree: true });
 
     return () => {
-      window.cancelAnimationFrame(frame);
       observer?.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
