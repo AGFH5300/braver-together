@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 
 const REVEAL_SELECTOR = [
   "main h1",
@@ -19,7 +19,8 @@ const INTERACTIVE_SELECTOR = [
   "header button[class*=\"rounded-\"]",
 ].join(",");
 
-let previousPathname: string | null = null;
+const useBrowserLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 function collectRevealNodes(root: HTMLElement): HTMLElement[] {
   const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
@@ -41,6 +42,7 @@ function collectRevealNodes(root: HTMLElement): HTMLElement[] {
 function delayFor(element: HTMLElement): number {
   const parent = element.parentElement;
   if (!parent) return 0;
+
   const siblings = Array.from(parent.children).filter(
     (child) => child instanceof HTMLElement,
   );
@@ -50,10 +52,12 @@ function delayFor(element: HTMLElement): number {
 
 function playReveal(element: HTMLElement) {
   if (element.dataset.btMotionPlayed === "true") return;
+
   element.dataset.btMotionPlayed = "true";
   element.style.setProperty("--bt-reveal-delay", `${delayFor(element)}ms`);
   element.classList.remove("bt-reveal-run");
 
+  // Restart cleanly in dev/HMR without ever leaving a hidden resting state.
   void element.offsetWidth;
   element.classList.add("bt-reveal-run");
 
@@ -66,35 +70,10 @@ function playReveal(element: HTMLElement) {
   element.addEventListener("animationcancel", finish, { once: true });
 }
 
-function isInternalNavigation(anchor: HTMLAnchorElement, event: MouseEvent) {
-  if (event.defaultPrevented || event.button !== 0) return false;
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
-  if (anchor.target && anchor.target !== "_self") return false;
-  if (anchor.hasAttribute("download")) return false;
-
-  const rawHref = anchor.getAttribute("href");
-  if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) {
-    return false;
-  }
-
-  const destination = new URL(anchor.href, window.location.href);
-  const current = new URL(window.location.href);
-
-  if (destination.origin !== current.origin) return false;
-  if (
-    destination.pathname === current.pathname &&
-    destination.search === current.search
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
 export function SiteMotion() {
   const location = useLocation();
 
-  useEffect(() => {
+  useBrowserLayoutEffect(() => {
     const root = document.getElementById("main-content");
     if (!root) return;
 
@@ -102,25 +81,10 @@ export function SiteMotion() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
-    const isNavigation =
-      previousPathname !== null && previousPathname !== location.pathname;
-    previousPathname = location.pathname;
 
-    // A new route should never inherit motion bookkeeping from an HMR update
-    // or a preserved DOM node.
-    for (const element of collectRevealNodes(root)) {
-      delete element.dataset.btMotionBound;
-      delete element.dataset.btMotionPlayed;
-      element.classList.remove(
-        "bt-reveal",
-        "bt-reveal-visible",
-        "bt-reveal-run",
-      );
-      element.style.removeProperty("--bt-reveal-delay");
-    }
-
-    root.classList.remove("bt-route-pending");
-    document.documentElement.classList.remove("bt-route-pending");
+    // Track only nodes owned by THIS route effect. The previous route must
+    // never clean up or cancel animation on the newly mounted route.
+    const ownedNodes = new Set<HTMLElement>();
 
     const updateHeader = () => {
       if (!header) return;
@@ -146,37 +110,48 @@ export function SiteMotion() {
             }
           },
           {
-            threshold: 0.08,
-            rootMargin: "0px 0px -7% 0px",
+            threshold: 0.01,
+            // Start just before the element enters the viewport, avoiding a
+            // visible "normal state -> animate again" jump while scrolling.
+            rootMargin: "0px 0px 96px 0px",
           },
         );
 
-    const bindBelowFold = () => {
-      for (const element of collectRevealNodes(root)) {
-        if (element.dataset.btMotionBound === "true") continue;
-        element.dataset.btMotionBound = "true";
+    const bindReveal = (element: HTMLElement) => {
+      if (element.dataset.btMotionBound === "true") return;
 
-        if (reducedMotion) {
-          element.dataset.btMotionPlayed = "true";
-          continue;
-        }
+      element.dataset.btMotionBound = "true";
+      ownedNodes.add(element);
 
-        const rect = element.getBoundingClientRect();
-        if (rect.bottom > 0 && rect.top < window.innerHeight) continue;
+      // Clear stale classes from old hot-reload builds only on this node.
+      element.classList.remove(
+        "bt-reveal",
+        "bt-reveal-visible",
+        "bt-reveal-run",
+      );
+      element.style.removeProperty("--bt-reveal-delay");
+
+      if (reducedMotion) {
+        element.dataset.btMotionPlayed = "true";
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const initiallyVisible =
+        rect.bottom > 0 && rect.top < window.innerHeight;
+
+      if (initiallyVisible) {
+        // Layout effect means this class is attached before the first live
+        // paint. On route navigation it continues underneath the 320ms
+        // snapshot transition, then remains visible afterwards.
+        playReveal(element);
+      } else {
         observer?.observe(element);
       }
     };
 
-    const playVisible = () => {
-      if (reducedMotion) return;
-      for (const element of collectRevealNodes(root)) {
-        const rect = element.getBoundingClientRect();
-        if (rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
-        playReveal(element);
-      }
-    };
-
-    const bindInteractiveAll = () => {
+    const bindAll = () => {
+      for (const element of collectRevealNodes(root)) bindReveal(element);
       for (const element of document.querySelectorAll<HTMLElement>(
         INTERACTIVE_SELECTOR,
       )) {
@@ -184,68 +159,35 @@ export function SiteMotion() {
       }
     };
 
-    const onDocumentClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const anchor = target.closest<HTMLAnchorElement>("a[href]");
-      if (!anchor || !isInternalNavigation(anchor, event)) return;
-
-      // Do not intercept navigation. This only gives instant visual feedback
-      // while the router resolves/preloads the next route.
-      root.classList.add("bt-route-pending");
-      document.documentElement.classList.add("bt-route-pending");
-    };
-
     updateHeader();
-    bindInteractiveAll();
-    bindBelowFold();
-
-    // View-transition snapshots sit above the live DOM while a route changes.
-    // Start the visible-page reveals just before that snapshot finishes, so
-    // the user actually sees the entrance motion instead of it completing
-    // invisibly underneath the snapshot.
-    const supportsViewTransitions =
-      typeof document !== "undefined" && "startViewTransition" in document;
-    const revealDelay =
-      isNavigation && supportsViewTransitions ? 285 : 24;
-    const revealTimer = window.setTimeout(playVisible, revealDelay);
+    bindAll();
 
     window.addEventListener("scroll", updateHeader, { passive: true });
-    document.addEventListener("click", onDocumentClick, true);
 
     const mutationObserver = new MutationObserver((records) => {
       if (!records.some((record) => record.addedNodes.length > 0)) return;
-      bindInteractiveAll();
-      bindBelowFold();
+      bindAll();
     });
 
     mutationObserver.observe(root, { childList: true, subtree: true });
 
-    // If a navigation fails or stalls, never leave the old page looking
-    // permanently faded.
-    const pendingSafetyTimer = window.setTimeout(() => {
-      root.classList.remove("bt-route-pending");
-      document.documentElement.classList.remove("bt-route-pending");
-    }, 1_500);
-
     return () => {
-      window.clearTimeout(revealTimer);
-      window.clearTimeout(pendingSafetyTimer);
       observer?.disconnect();
       mutationObserver.disconnect();
       window.removeEventListener("scroll", updateHeader);
-      document.removeEventListener("click", onDocumentClick, true);
 
-      root.classList.remove("bt-route-pending");
-      document.documentElement.classList.remove("bt-route-pending");
-
-      for (const element of collectRevealNodes(root)) {
+      // Only clean up nodes this exact route effect bound. Never query the
+      // shared root here; by cleanup time it may already contain the next page.
+      for (const element of ownedNodes) {
+        observer?.unobserve(element);
         element.classList.remove(
           "bt-reveal",
           "bt-reveal-visible",
           "bt-reveal-run",
         );
         element.style.removeProperty("--bt-reveal-delay");
+        delete element.dataset.btMotionBound;
+        delete element.dataset.btMotionPlayed;
       }
     };
   }, [location.pathname]);
