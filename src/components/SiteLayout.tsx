@@ -42,7 +42,7 @@ function BrandMark({ className }: { className?: string }) {
       )}
     >
       <img
-        src="/bravertogether-logo.webp?v=20260921-3"
+        src="/bravertogether-logo.webp?v=20260921-4"
         alt=""
         aria-hidden="true"
         className="h-[88%] w-[88%] object-contain"
