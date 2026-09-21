@@ -22,8 +22,6 @@ const INTERACTIVE_SELECTOR = [
 const useBrowserLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-let previousPathname: string | null = null;
-
 function collectRevealNodes(root: HTMLElement): HTMLElement[] {
   const all = Array.from(root.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
   const unique = Array.from(new Set(all)).filter(
@@ -87,11 +85,6 @@ export function SiteMotion() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     const header = document.querySelector<HTMLElement>(".bt-site-header");
-    const isRouteNavigation =
-      previousPathname !== null && previousPathname !== location.pathname;
-
-    previousPathname = location.pathname;
-
     const ownedNodes = new Set<HTMLElement>();
 
     const updateHeader = () => {
@@ -147,15 +140,10 @@ export function SiteMotion() {
         rect.bottom > 0 && rect.top < window.innerHeight;
 
       if (initiallyVisible) {
-        if (isRouteNavigation) {
-          // The route transition already animates the visible page entrance.
-          // Mark it complete so it never "replays" when the user scrolls.
-          element.dataset.btMotionPlayed = "true";
-        } else {
-          // Cold load: prep + animate before the first paint.
-          prepReveal(element);
-          playReveal(element);
-        }
+        // The page is already visible by the time hydration runs on a cold
+        // load, and route navigation already has its own page transition.
+        // Never replay a reveal for content the user can already see.
+        element.dataset.btMotionPlayed = "true";
       } else {
         // Critical: off-screen content is placed in its start state NOW,
         // before the user can scroll to it. It can never appear static first.
