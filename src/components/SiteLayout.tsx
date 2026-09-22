@@ -37,7 +37,7 @@ function BrandMark({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "bt-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/70 bg-white shadow-glow",
+        "bt-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white shadow-glow",
         className,
       )}
     >
@@ -45,7 +45,7 @@ function BrandMark({ className }: { className?: string }) {
         src="/bravertogether-logo.webp?v=20260921-4"
         alt=""
         aria-hidden="true"
-        className="h-[88%] w-[88%] object-contain"
+        className="h-[88%] w-[88%] rounded-full object-contain"
         width="512"
         height="512"
         loading="eager"
@@ -438,7 +438,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="bt-footer border-t border-border bg-mesh text-white">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-14">
+        <div className="mx-auto max-w-7xl px-4 pb-8 pt-12 sm:px-6 sm:pb-9 sm:pt-14">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.9fr_0.9fr_1.3fr] lg:gap-12">
             <div>
               <div className="mb-3 flex items-center gap-2">
