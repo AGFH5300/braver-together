@@ -227,7 +227,6 @@ function Decoder() {
           )}
         </div>
       </div>
-      <div className="pt-32" />
     </SiteLayout>
   );
 }
