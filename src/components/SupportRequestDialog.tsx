@@ -48,7 +48,7 @@ export function SupportRequestDialog({
     setSubject("");
     setTopic("general");
     setMessage("");
-    setAllowAi(true);
+    setAllowAi(false);
   }
 
   async function submit(event: React.FormEvent) {
