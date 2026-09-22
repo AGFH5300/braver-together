@@ -11,8 +11,29 @@ export const Route = createFileRoute("/api/signup-email-check")({
       POST: async ({ request }) => {
         const requestUrl = new URL(request.url);
         const origin = request.headers.get("origin");
+        const forwardedHost = request.headers
+          .get("x-forwarded-host")
+          ?.split(",")[0]
+          ?.trim();
+        const forwardedProto = request.headers
+          .get("x-forwarded-proto")
+          ?.split(",")[0]
+          ?.trim();
+        const host = forwardedHost || request.headers.get("host");
+        const protocol =
+          forwardedProto || requestUrl.protocol.replace(/:$/, "");
+        const expectedOrigin = host
+          ? `${protocol}://${host}`
+          : requestUrl.origin;
 
-        if (!origin || origin !== requestUrl.origin) {
+        let normalizedOrigin: string | null = null;
+        try {
+          normalizedOrigin = origin ? new URL(origin).origin : null;
+        } catch {
+          normalizedOrigin = null;
+        }
+
+        if (!normalizedOrigin || normalizedOrigin !== expectedOrigin) {
           return Response.json(
             { error: "Invalid request origin." },
             { status: 403, headers: { "Cache-Control": "no-store" } },
