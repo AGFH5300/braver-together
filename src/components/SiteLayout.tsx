@@ -438,25 +438,57 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="bt-footer border-t border-border bg-mesh text-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 md:grid-cols-3">
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <BrandMark />
-              <span className="font-display text-lg font-bold">BraverTogether</span>
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-14">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.9fr_0.9fr_1.3fr] lg:gap-12">
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <BrandMark />
+                <span className="font-display text-lg font-bold">BraverTogether</span>
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-white/70">
+                Free digital legal literacy for teens aged 12–18.
+              </p>
             </div>
-            <p className="max-w-xs text-sm leading-relaxed text-white/70">Free digital legal literacy for teens aged 12–18. Built by Tara Vishwakarthik.</p>
+
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4>
+              <FooterLinks access={access} />
+            </div>
+
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-teal-soft">Safety & policies</h4>
+              <ul className="space-y-2 text-sm text-white/70">
+                <li><Link to="/privacy" className="transition hover:text-white">Privacy</Link></li>
+                <li><Link to="/safety" className="transition hover:text-white">Safety</Link></li>
+                <li><Link to="/community-guidelines" className="transition hover:text-white">Community Guidelines</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4>
+              <p className="max-w-md text-xs leading-relaxed text-white/65">
+                All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-teal-soft">Explore</h4>
-            <FooterLinks access={access} />
-            <ul className="mt-4 space-y-2 text-sm text-white/70"><li><Link to="/privacy">Privacy</Link></li><li><Link to="/safety">Safety</Link></li><li><Link to="/community-guidelines">Community Guidelines</Link></li></ul>
-          </div>
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-teal-soft">Disclaimer</h4>
-            <p className="text-xs leading-relaxed text-white/65">All content on this platform is for educational purposes only and does not constitute legal advice. Always consult a qualified lawyer for legal matters specific to your jurisdiction.</p>
+
+          <div className="mt-10 border-t border-white/10 pt-6 text-center">
+            <p className="text-xs text-white/55 sm:text-sm">
+              © {new Date().getFullYear()} BraverTogether. All rights reserved.
+            </p>
+            <p className="mt-1 text-xs text-white/65 sm:text-sm">
+              Made by{" "}
+              <a
+                href="https://anshgupta.cc"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                Ansh Gupta
+              </a>
+            </p>
           </div>
         </div>
-        <div className="border-t border-white/10 py-4 text-center text-xs text-white/55">© {new Date().getFullYear()} BraverTogether · Digital Legal Literacy Initiative</div>
       </footer>
     </div>
   );
