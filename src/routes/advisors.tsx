@@ -9,7 +9,7 @@ import { AdvisorIntentTrigger } from "@/components/AdvisorIntentDialog";
 import { useAccountAccess } from "@/hooks/use-account-access";
 import { supabase } from "@/integrations/supabase/client";
 import { roleHome } from "@/lib/account-access";
-import { createSupportRequest, listPublicAdvisors } from "@/lib/support.functions";
+import { askSupportAi, createSupportRequest, listPublicAdvisors } from "@/lib/support.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/advisors")({
@@ -52,6 +52,7 @@ const topics = [
 function Advisors() {
   const navigate = useNavigate();
   const createRequest = useServerFn(createSupportRequest);
+  const askAi = useServerFn(askSupportAi);
   const access = useAccountAccess();
   const advisors = Route.useLoaderData() as AdvisorProfile[];
   const loading = false;
@@ -102,6 +103,23 @@ function Advisors() {
         allowAiFallback: !selectedAdvisor && allowAi,
       } });
       toast.success(selectedAdvisor ? "Conversation started" : "Your question was sent to the advisor team");
+
+      if (!selectedAdvisor && allowAi) {
+        try {
+          const aiResult = await askAi({
+            data: { conversationId: result.id, message },
+          });
+          if (aiResult.configured) {
+            toast.success("Limited AI helper replied while your request remains in the human queue");
+          } else {
+            toast.info(aiResult.message);
+          }
+        } catch (aiError) {
+          console.warn("[Support AI] Initial reply failed:", aiError);
+          toast.info("Your request is in the human advisor queue. The AI helper could not reply right now.");
+        }
+      }
+
       await navigate({ to: "/messages", search: { c: result.id, view: undefined } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Your question could not be submitted.");
