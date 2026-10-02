@@ -63,6 +63,7 @@ const groups: Group[] = [
     members: [
       { name: "Aryaveer Babu", role: "Head of Digital Legal Advisors" },
       { name: "Malak Jundi", role: "Deputy Head of Digital Legal Advisors" },
+      { name: "Sathvika Kancharla", role: "Digital Legal Advisor", image: "/advisors/sathvika.svg" },
     ],
   },
 ];
