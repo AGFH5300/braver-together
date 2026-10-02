@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { createSupportRequest } from "@/lib/support.functions";
+import { askSupportAi, createSupportRequest } from "@/lib/support.functions";
 
 const topics = [
   ["privacy", "Privacy & personal data"],
@@ -27,6 +27,7 @@ export function SupportRequestDialog({
   onCreated: (conversationId: string) => void | Promise<void>;
 }) {
   const createRequest = useServerFn(createSupportRequest);
+  const askAi = useServerFn(askSupportAi);
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState<Topic>("general");
   const [message, setMessage] = useState("");
@@ -67,6 +68,23 @@ export function SupportRequestDialog({
         },
       });
       toast.success("Support request created");
+
+      if (allowAi) {
+        try {
+          const aiResult = await askAi({
+            data: { conversationId: result.id, message },
+          });
+          if (aiResult.configured) {
+            toast.success("Limited AI helper replied while your request remains in the human queue");
+          } else {
+            toast.info(aiResult.message);
+          }
+        } catch (aiError) {
+          console.warn("[Support AI] Initial reply failed:", aiError);
+          toast.info("Your request is in the human advisor queue. The AI helper could not reply right now.");
+        }
+      }
+
       reset();
       onClose();
       await onCreated(result.id);
