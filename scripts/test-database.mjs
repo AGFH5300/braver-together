@@ -15,9 +15,9 @@ for(const file of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.
 }
 const {rows:[c]}=await db.query('select * from public.competitions');
 assert.equal(c.title,'Digital Legal Rights Essay Competition');assert.equal(c.minimum_age,null);assert.equal(c.minimum_words,null);assert.equal(c.maximum_words,1500);assert.equal(c.prompts.length,4);assert.equal(c.status,'open');
-assert.equal((await db.query('select count(*)::int n from public.public_advisors')).rows[0].n,6);
+assert.equal((await db.query('select count(*)::int n from public.public_advisors')).rows[0].n,7);
 await db.exec('SET ROLE anon');
-assert.equal((await db.query('select display_name from public.public_advisors')).rows.length,6);
+assert.equal((await db.query('select display_name from public.public_advisors')).rows.length,7);
 await assert.rejects(db.query('select linked_user_id from public.public_advisors'));
 await assert.rejects(db.query("select public.consume_ai_allowance('decoder','test',10)"));
 await db.exec('RESET ROLE; SET ROLE service_role');
