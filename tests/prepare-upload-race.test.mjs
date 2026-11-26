@@ -74,7 +74,8 @@ function loadCvPrepare(supabaseAdmin) {
 }
 
 function racingSupabase({ table, bucket, committedColumn, pendingColumn, staleRow, oldPendingPath,
-  finalizeDuringUpsert = true, failRecheck = false }) {
+  finalizeDuringUpsert = true, failRecheck = false,
+  signedUrlFails = false, approveDuringSignedUrl = false }) {
   const state = {
     row: { ...staleRow },
     objects: new Set([staleRow[committedColumn], oldPendingPath]),
@@ -125,6 +126,17 @@ function racingSupabase({ table, bucket, committedColumn, pendingColumn, staleRo
           Object.assign(state.row, payload); // DB upsert preserves omitted committed columns.
           return { data: null, error: null };
         },
+        update(fields) {
+          const filters = {};
+          return {
+            eq(column, value) { filters[column] = value; return this; },
+            then(resolve, reject) {
+              const matches = Object.entries(filters).every(([column, value]) => state.row[column] === value);
+              if (matches) Object.assign(state.row, fields);
+              return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+            },
+          };
+        },
       };
     },
     storage: { from(name) {
@@ -132,6 +144,10 @@ function racingSupabase({ table, bucket, committedColumn, pendingColumn, staleRo
       return {
         async createSignedUploadUrl(path) {
           assert.equal(path, state.row[pendingColumn], 'sign the newly prepared path Y');
+          if (signedUrlFails) {
+            if (approveDuringSignedUrl) state.row.status = 'approved';
+            return { data: null, error: { message: 'synthetic signed-upload failure' } };
+          }
           return { data: { token: 'fake-signed-upload-token' }, error: null };
         },
         async remove(paths) {
@@ -271,4 +287,26 @@ test('prepareEssayUpload leaves the old PDF intact when its post-upsert database
   } });
   assert.equal(state.reads, 2);
   assert.equal(state.removed.includes(oldPendingPath), false, 'uncertainty must not delete a private object');
+});
+
+test('prepareAdvisorCvUpload signed-URL failure cannot undo an administrator approval', async () => {
+  const oldCommittedPath = `${userId}/${documentId}/verified-cv.pdf`;
+  const oldPendingPath = `${userId}/${documentId}/stale-cv.pdf`;
+  const { db, state } = racingSupabase({
+    table: 'advisor_applications', bucket: 'advisor-cvs',
+    committedColumn: 'cv_file_path', pendingColumn: 'pending_cv_file_path', oldPendingPath,
+    finalizeDuringUpsert: false, signedUrlFails: true, approveDuringSignedUrl: true,
+    staleRow: { id: documentId, user_id: userId, status: 'pending',
+      cv_file_path: oldCommittedPath, pending_cv_file_path: oldPendingPath },
+  });
+  await assert.rejects(loadCvPrepare(db)({ context: { userId }, data: {
+    fullName: 'Example Applicant', email: 'applicant@example.test',
+    organization: 'Test School', roleTitle: 'Teacher', location: 'Testland',
+    experience: 'I have experience mentoring students for many school years.',
+    motivation: 'I would like to help young people improve their communication skills.',
+    focusAreas: ['Student mentoring'], profileUrl: '', availabilityNote: '',
+    originalFilename: 'cv.pdf', mimeType: pdfMime, fileSize: 42, fileSha256: fakeSha,
+  } }), /synthetic signed-upload failure/);
+  assert.equal(state.row.status, 'approved', 'a stale prepare rollback must preserve admin approval');
+  assert.equal(state.row.cv_file_path, oldCommittedPath, 'prior verified CV remains referenced');
 });
