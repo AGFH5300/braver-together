@@ -42,7 +42,7 @@ function loadFinalize(supabaseAdmin) {
 }
 
 function service({ winnerAlreadyCommitted = false, failEventAfterCommit = false,
-  failDownloadBeforeCommit = false } = {}) {
+  failDownloadBeforeCommit = false, approveBeforeCleanup = false } = {}) {
   const state = {
     cvFilePath: winnerAlreadyCommitted ? filePath : 'old-cv.pdf',
     pendingPath: winnerAlreadyCommitted ? null : filePath,
@@ -73,14 +73,18 @@ function service({ winnerAlreadyCommitted = false, failEventAfterCommit = false,
         },
         update(fields) {
           const finalization = fields.cv_file_path === filePath;
+          const predicates = {};
           const execute = async () => {
+              if (Object.hasOwn(predicates, 'status') && state.status !== predicates.status) {
+                return { data: null, error: null };
+              }
               if (state.pendingPath !== filePath) return { data: null, error: null };
               state.pendingPath = null;
               if (finalization) { state.cvFilePath = filePath; state.status = 'pending'; }
               else state.status = fields.status;
               return { data: { id: applicationId }, error: null };
           };
-          return { eq() { return this; },
+          return { eq(column, value) { predicates[column] = value; return this; },
             select() { return { maybeSingle: execute }; },
             then(ok, bad) { return execute().then(ok, bad); },
           };
@@ -101,7 +105,10 @@ function service({ winnerAlreadyCommitted = false, failEventAfterCommit = false,
       assert.equal(bucket, 'advisor-cvs');
       return {
         async download() {
-          if (failDownloadBeforeCommit) return { data: null, error: { message: 'injected CV download failure' } };
+          if (failDownloadBeforeCommit) {
+            if (approveBeforeCleanup) state.status = 'approved';
+            return { data: null, error: { message: 'injected CV download failure' } };
+          }
           return { data: new Blob([pdf]), error: null };
         },
         async remove(paths) {
@@ -141,5 +148,13 @@ test('uncommitted failed CV upload can be cleaned while preserving old verified 
   assert.equal(state.status, 'draft');
   assert.equal(state.objects.has(filePath), false);
   assert.equal(state.objects.has('old-cv.pdf'), true);
+});
+
+test('failed CV verification never overwrites a concurrent administrator approval', async () => {
+  const { state, fn } = service({ failDownloadBeforeCommit: true, approveBeforeCleanup: true });
+  await assert.rejects(fn({ data: { applicationId, filePath }, context: { userId } }),
+    /injected CV download failure/);
+  assert.equal(state.status, 'approved', 'the administrator decision must not be reset by stale cleanup');
+  assert.equal(state.objects.has(filePath), true, 'uncertain pending CV is retained for later cleanup');
 });
 
