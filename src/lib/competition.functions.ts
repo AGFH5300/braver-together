@@ -247,7 +247,20 @@ export const prepareEssayUpload = createServerFn({ method: "POST" })
       throw new Error(signedError?.message || "A secure upload slot could not be created.");
     }
 
-    if (existing?.pending_file_path && existing.pending_file_path !== existing.file_path) await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([existing.pending_file_path]);
+    if (existing?.pending_file_path && existing.pending_file_path !== existing.file_path) {
+      // Finalization may have committed the old pending object before our
+      // upsert installed this new slot. Check the row after the upsert before
+      // removing any path from the stale initial snapshot.
+      const { data: current, error: currentError } = await supabaseAdmin
+        .from("essay_submissions")
+        .select("file_path, pending_file_path")
+        .eq("id", submissionId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (!currentError && current?.pending_file_path === filePath && current.file_path !== existing.pending_file_path) {
+        await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([existing.pending_file_path]);
+      }
+    }
     return {
       submissionId,
       submissionCode,
@@ -336,18 +349,37 @@ export const finalizeEssayUpload = createServerFn({ method: "POST" })
         submittedAt: now,
       };
     } catch (error) {
-      await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([data.filePath]);
-      await supabaseAdmin
-        .from("essay_submissions")
-        .update({
-          pending_file_path: null,
-          pending_original_filename: null,
-          pending_mime_type: null,
-          pending_file_size: null,
-          pending_file_sha256: null,
-        })
-        .eq("id", submission.id)
-        .eq("pending_file_path", data.filePath);
+      // A parallel finalization may already have committed this exact object.
+      // Never remove the file while any finalized row points at it. Clear the
+      // *matching* pending slot first, then remove only if that conditional
+      // update actually succeeded; a concurrent winner makes it affect 0 rows.
+      try {
+        const { data: current } = await supabaseAdmin
+          .from("essay_submissions")
+          .select("file_path, pending_file_path")
+          .eq("id", submission.id)
+          .eq("user_id", context.userId)
+          .maybeSingle();
+        if (current?.file_path !== data.filePath && current?.pending_file_path === data.filePath) {
+          const { data: cleared, error: clearError } = await supabaseAdmin
+            .from("essay_submissions")
+            .update({
+              pending_file_path: null,
+              pending_original_filename: null,
+              pending_mime_type: null,
+              pending_file_size: null,
+              pending_file_sha256: null,
+            })
+            .eq("id", submission.id)
+            .eq("user_id", context.userId)
+            .eq("pending_file_path", data.filePath)
+            .select("id")
+            .maybeSingle();
+          if (!clearError && cleared) await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([data.filePath]);
+        }
+      } catch (cleanupError) {
+        console.error("Could not clean up an uncommitted essay upload:", cleanupError);
+      }
       throw error;
     }
   });

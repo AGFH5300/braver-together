@@ -20,7 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run build && npm run typecheck && npm run lint && npm test",
-    "test": "node --experimental-strip-types --test src/lib/*.test.ts && npm run test:db",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts && node --test tests/*.test.mjs && npm run test:db",
     "test:db": "node scripts/test-database.mjs"
   },
   "dependencies": {
