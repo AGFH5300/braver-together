@@ -375,20 +375,38 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
         filename: application.pending_cv_original_filename,
       };
     } catch (error) {
-      await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([data.filePath]);
-      await supabaseAdmin
-        .from("advisor_applications")
-        .update({
-          status: application.pending_previous_status ?? "draft",
-          pending_cv_file_path: null,
-          pending_cv_original_filename: null,
-          pending_cv_mime_type: null,
-          pending_cv_file_size: null,
-          pending_cv_file_sha256: null,
-          pending_previous_status: null,
-        })
-        .eq("id", application.id)
-        .eq("pending_cv_file_path", data.filePath);
+      // A retry can lose to an earlier successful finalization. Never delete
+      // a CV now referenced by the committed application. Only remove an
+      // uncommitted file *after* conditionally releasing its matching slot.
+      try {
+        const { data: current } = await supabaseAdmin
+          .from("advisor_applications")
+          .select("cv_file_path, pending_cv_file_path")
+          .eq("id", application.id)
+          .eq("user_id", context.userId)
+          .maybeSingle();
+        if (current?.cv_file_path !== data.filePath && current?.pending_cv_file_path === data.filePath) {
+          const { data: cleared, error: clearError } = await supabaseAdmin
+            .from("advisor_applications")
+            .update({
+              status: application.pending_previous_status ?? "draft",
+              pending_cv_file_path: null,
+              pending_cv_original_filename: null,
+              pending_cv_mime_type: null,
+              pending_cv_file_size: null,
+              pending_cv_file_sha256: null,
+              pending_previous_status: null,
+            })
+            .eq("id", application.id)
+            .eq("user_id", context.userId)
+            .eq("pending_cv_file_path", data.filePath)
+            .select("id")
+            .maybeSingle();
+          if (!clearError && cleared) await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([data.filePath]);
+        }
+      } catch (cleanupError) {
+        console.error("Could not clean up an uncommitted CV upload:", cleanupError);
+      }
       throw error;
     }
   });
