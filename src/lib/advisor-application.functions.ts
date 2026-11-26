@@ -264,7 +264,17 @@ export const prepareAdvisorCvUpload = createServerFn({ method: "POST" })
     if (saveError) throw new Error(saveError.message);
 
     if (existing?.pending_cv_file_path && existing.pending_cv_file_path !== filePath) {
-      await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([existing.pending_cv_file_path]);
+      // A concurrent finalize can commit this old path before our upsert.
+      // Never delete a file referenced by the freshly observed committed CV.
+      const { data: current, error: currentError } = await supabaseAdmin
+        .from("advisor_applications")
+        .select("cv_file_path, pending_cv_file_path")
+        .eq("id", applicationId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (!currentError && current?.pending_cv_file_path === filePath && current.cv_file_path !== existing.pending_cv_file_path) {
+        await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([existing.pending_cv_file_path]);
+      }
     }
 
     const { data: signed, error: signedError } = await supabaseAdmin.storage
@@ -400,6 +410,7 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
             .eq("id", application.id)
             .eq("user_id", context.userId)
             .eq("pending_cv_file_path", data.filePath)
+            .eq("status", "draft")
             .select("id")
             .maybeSingle();
           if (!clearError && cleared) await supabaseAdmin.storage.from(ADVISOR_CV_BUCKET).remove([data.filePath]);
