@@ -292,7 +292,10 @@ export const prepareAdvisorCvUpload = createServerFn({ method: "POST" })
           pending_cv_file_sha256: null,
           pending_previous_status: null,
         })
-        .eq("id", applicationId).eq("pending_cv_file_path", filePath);
+        .eq("id", applicationId)
+        .eq("user_id", context.userId)
+        .eq("pending_cv_file_path", filePath)
+        .eq("status", "draft");
       throw new Error(signedError?.message || "The CV upload could not be started.");
     }
 
@@ -358,7 +361,10 @@ export const finalizeAdvisorCvUpload = createServerFn({ method: "POST" })
           admin_note: null,
         })
         .eq("id", application.id)
-        .eq("pending_cv_file_path", data.filePath).select("id").maybeSingle();
+        .eq("user_id", context.userId)
+        .eq("pending_cv_file_path", data.filePath)
+        .eq("status", "draft")
+        .select("id").maybeSingle();
       if (finalizeError) throw new Error(finalizeError.message);
       if (!finalized) throw new Error("This upload slot has changed. Select the file again.");
 
