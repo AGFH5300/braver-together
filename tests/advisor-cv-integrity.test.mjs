@@ -42,7 +42,8 @@ function loadFinalize(supabaseAdmin) {
 }
 
 function service({ winnerAlreadyCommitted = false, failEventAfterCommit = false,
-  failDownloadBeforeCommit = false, approveBeforeCleanup = false } = {}) {
+  failDownloadBeforeCommit = false, approveBeforeCleanup = false,
+  approveBeforeCommit = false } = {}) {
   const state = {
     cvFilePath: winnerAlreadyCommitted ? filePath : 'old-cv.pdf',
     pendingPath: winnerAlreadyCommitted ? null : filePath,
@@ -109,6 +110,7 @@ function service({ winnerAlreadyCommitted = false, failEventAfterCommit = false,
             if (approveBeforeCleanup) state.status = 'approved';
             return { data: null, error: { message: 'injected CV download failure' } };
           }
+          if (approveBeforeCommit) state.status = 'approved';
           return { data: new Blob([pdf]), error: null };
         },
         async remove(paths) {
@@ -156,5 +158,14 @@ test('failed CV verification never overwrites a concurrent administrator approva
     /injected CV download failure/);
   assert.equal(state.status, 'approved', 'the administrator decision must not be reset by stale cleanup');
   assert.equal(state.objects.has(filePath), true, 'uncertain pending CV is retained for later cleanup');
+});
+
+test('successful CV verification cannot roll back an administrator approval made during download', async () => {
+  const { state, fn } = service({ approveBeforeCommit: true });
+  await assert.rejects(fn({ data: { applicationId, filePath }, context: { userId } }),
+    /upload slot has changed/i);
+  assert.equal(state.status, 'approved', 'the existing administrator decision must survive');
+  assert.equal(state.cvFilePath, 'old-cv.pdf', 'the earlier verified CV is still the committed file');
+  assert.equal(state.objects.has(filePath), true, 'uncommitted candidate CV is retained for later cleanup');
 });
 
