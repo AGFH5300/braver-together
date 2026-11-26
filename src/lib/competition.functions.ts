@@ -247,7 +247,20 @@ export const prepareEssayUpload = createServerFn({ method: "POST" })
       throw new Error(signedError?.message || "A secure upload slot could not be created.");
     }
 
-    if (existing?.pending_file_path && existing.pending_file_path !== existing.file_path) await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([existing.pending_file_path]);
+    if (existing?.pending_file_path && existing.pending_file_path !== existing.file_path) {
+      // Finalization may have committed the old pending object before our
+      // upsert installed this new slot. Check the row after the upsert before
+      // removing any path from the stale initial snapshot.
+      const { data: current, error: currentError } = await supabaseAdmin
+        .from("essay_submissions")
+        .select("file_path, pending_file_path")
+        .eq("id", submissionId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (!currentError && current?.pending_file_path === filePath && current.file_path !== existing.pending_file_path) {
+        await supabaseAdmin.storage.from(ESSAY_BUCKET).remove([existing.pending_file_path]);
+      }
+    }
     return {
       submissionId,
       submissionCode,
