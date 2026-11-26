@@ -77,18 +77,20 @@ function makeService({ winnerAlreadyCommitted = false, failAuditAfterCommit = fa
         update(fields) {
           state.updates.push(fields);
           const finalization = fields.status === 'submitted';
+          const execute = async () => {
+            if (state.pendingPath !== path) return { data: null, error: null };
+            if (finalization) {
+              state.filePath = path;
+              state.pendingPath = null;
+              state.revision = 1;
+            } else {
+              state.pendingPath = null;
+            }
+            return { data: { id: submissionId }, error: null };
+          };
           return { eq(_column, _value) { return this; },
-            select() { return { async maybeSingle() {
-              if (state.pendingPath !== path) return { data: null, error: null };
-              if (finalization) {
-                state.filePath = path;
-                state.pendingPath = null;
-                state.revision = 1;
-              } else {
-                state.pendingPath = null;
-              }
-              return { data: { id: submissionId }, error: null };
-            } }; },
+            select() { return { maybeSingle: execute }; },
+            then(resolve, reject) { return execute().then(resolve, reject); },
           };
         },
       };
